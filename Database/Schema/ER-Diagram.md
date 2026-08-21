@@ -31,6 +31,7 @@ erDiagram
         varchar status
     }
 
+
     VEHICLE {
         bigint vehicle_id PK
         bigint customer_id FK
@@ -42,6 +43,7 @@ erDiagram
         timestamp created_at
     }
 
+
     POLICY_TYPE {
         bigint policy_type_id PK
         varchar policy_name UK
@@ -51,6 +53,7 @@ erDiagram
         boolean is_active
     }
 
+
     COVERAGE_TYPE {
         bigint coverage_type_id PK
         varchar coverage_name UK
@@ -58,10 +61,12 @@ erDiagram
         boolean is_active
     }
 
+
     POLICY_COVERAGE {
         bigint policy_type_id PK, FK
         bigint coverage_type_id PK, FK
     }
+
 
     POLICY {
         bigint policy_id PK
@@ -74,6 +79,7 @@ erDiagram
         timestamp created_at
     }
 
+
     CLAIM {
         bigint claim_id PK
         varchar claim_number UK
@@ -82,9 +88,12 @@ erDiagram
         timestamp claim_date
         text description
         decimal claimed_amount
+        decimal approved_amount
         varchar status
+        text decision_remarks
         timestamp created_at
     }
+
 
     CLAIM_IMAGE {
         bigint image_id PK
@@ -94,16 +103,19 @@ erDiagram
         timestamp uploaded_at
     }
 
+
     AI_ANALYSIS {
         bigint analysis_id PK
-        bigint claim_id FK
+        bigint claim_id FK, UK
         varchar damage_severity
         decimal confidence_score
         decimal estimated_repair_cost
         varchar risk_level
+        decimal fraud_score
         varchar model_version
         timestamp analyzed_at
     }
+
 
     CLAIM_HISTORY {
         bigint history_id PK
@@ -113,6 +125,7 @@ erDiagram
         text remarks
         timestamp changed_at
     }
+
 
     CLAIM_OFFICER {
         bigint officer_id PK
