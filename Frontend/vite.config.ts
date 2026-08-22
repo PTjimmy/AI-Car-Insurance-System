@@ -15,4 +15,14 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    proxy: {
+      // Forward all /api/v1/* requests to the FastAPI backend
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });

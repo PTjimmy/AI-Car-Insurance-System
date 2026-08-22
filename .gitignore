@@ -1,0 +1,48 @@
+# ============================================================
+# AI Car Insurance System — root .gitignore
+# ============================================================
+
+# ----- Secrets — NEVER commit these -----
+Backend/.env
+*.env
+.env.*
+!.env.example
+
+# ----- AI model weights (too large for git) -----
+Backend/ai_model/*.pth
+Backend/ai_model/*.pt
+
+# ----- Uploaded claim images -----
+Backend/uploads/
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+Backend/.venv/
+Backend/venv/
+Backend/env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# ----- Node / Frontend -----
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.env
+Frontend/.env.local
+
+# ----- macOS -----
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ----- Editors -----
+.vscode/settings.json
+.idea/
+*.swp
+*.swo

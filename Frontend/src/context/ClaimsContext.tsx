@@ -1,68 +1,65 @@
+/**
+ * ClaimsContext — wraps the customer claims API.
+ * Replaces the old static mock data from src/data/claims.ts.
+ * Only used by customer-facing pages. Officer and Admin pages
+ * call the API directly.
+ */
+
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { type Claim, customerApi } from "../lib/api";
+import { useAuth } from "./AuthContext";
 
-import {
-  claims as initialClaims,
-  type Claim,
-  type ClaimStatus,
-} from "../data/claims";
-
-type ClaimsContextType = {
+interface ClaimsContextType {
   claims: Claim[];
-  updateClaimStatus: (
-    claimNumber: string,
-    status: ClaimStatus
-  ) => void;
-};
-
-const ClaimsContext = createContext<ClaimsContextType | undefined>(
-  undefined
-);
-
-export function ClaimsProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  const [claims, setClaims] = useState<Claim[]>(initialClaims);
-
-  const updateClaimStatus = (
-    claimNumber: string,
-    status: ClaimStatus
-  ) => {
-    setClaims((currentClaims) =>
-      currentClaims.map((claim) =>
-        claim.number === claimNumber
-          ? { ...claim, status }
-          : claim
-      )
-    );
-  };
-
-  return (
-    <ClaimsContext.Provider
-      value={{
-        claims,
-        updateClaimStatus,
-      }}
-    >
-      {children}
-    </ClaimsContext.Provider>
-  );
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
 }
 
-export function useClaims() {
-  const context = useContext(ClaimsContext);
+const ClaimsContext = createContext<ClaimsContextType | undefined>(undefined);
 
-  if (!context) {
-    throw new Error(
-      "useClaims must be used inside ClaimsProvider"
-    );
-  }
+export function ClaimsProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated, user } = useAuth();
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  return context;
+  const refresh = useCallback(async () => {
+    if (!isAuthenticated || user?.role !== "CUSTOMER") return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await customerApi.getClaims();
+      setClaims(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load claims.");
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const value = useMemo(
+    () => ({ claims, loading, error, refresh }),
+    [claims, loading, error, refresh]
+  );
+
+  return <ClaimsContext.Provider value={value}>{children}</ClaimsContext.Provider>;
+}
+
+export function useClaims(): ClaimsContextType {
+  const ctx = useContext(ClaimsContext);
+  if (!ctx) throw new Error("useClaims must be used inside ClaimsProvider");
+  return ctx;
 }
