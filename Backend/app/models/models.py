@@ -236,7 +236,8 @@ class Claim(Base):
     claimed_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     approved_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     status: Mapped[ClaimStatus] = mapped_column(
-        Enum(ClaimStatus, name="claim_status", schema="public"),
+        Enum(ClaimStatus, name="claim_status", schema="public",
+             values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=ClaimStatus.PENDING,
     )
@@ -313,7 +314,8 @@ class ClaimHistory(Base):
         BigInteger, ForeignKey("claim_officer.officer_id"), nullable=False
     )
     status: Mapped[ClaimStatus] = mapped_column(
-        Enum(ClaimStatus, name="claim_status", schema="public"), nullable=False
+        Enum(ClaimStatus, name="claim_status", schema="public",
+             values_callable=lambda x: [e.value for e in x]), nullable=False
     )
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     changed_at: Mapped[datetime] = mapped_column(server_default=func.now())
