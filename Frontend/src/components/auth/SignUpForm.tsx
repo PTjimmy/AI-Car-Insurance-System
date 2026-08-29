@@ -43,6 +43,8 @@ export default function SignUpForm() {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
       } else {
         setError("An unexpected error occurred. Please try again.");
       }

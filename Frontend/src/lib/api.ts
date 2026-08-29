@@ -319,10 +319,12 @@ export const adminApi = {
 };
 
 // Image URL helper — authenticated image served by backend
+// Uses ?token= query param so browser <img> tags can display images
+// without needing to set Authorization headers.
 export function imageUrl(filename: string): string {
-  // Extract just the filename from a full path if needed
   const name = filename.split("/").pop() ?? filename;
-  return `${BASE}/images/${name}`;
+  const token = localStorage.getItem("access_token") ?? "";
+  return `${BASE}/images/${name}?token=${encodeURIComponent(token)}`;
 }
 
 export { ApiError };
