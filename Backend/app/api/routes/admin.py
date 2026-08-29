@@ -1,16 +1,20 @@
 """
 Admin routes:
-  GET  /admin/users                         — list all users
-  PUT  /admin/users/{user_id}/deactivate    — deactivate a user
-  GET  /admin/claims                        — list all claims
-  GET  /admin/claims/{claim_id}             — full claim detail
-  POST /admin/claims/{claim_id}/assign      — assign officer to claim
-  GET  /admin/officers                      — list all officers
-  POST /admin/officers                      — create officer account
-  GET  /admin/stats                         — dashboard statistics
+  GET    /admin/users                         — list all users with metadata
+  GET    /admin/users/{user_id}               — single user detail
+  PUT    /admin/users/{user_id}/deactivate    — deactivate a user
+  PUT    /admin/users/{user_id}/activate      — reactivate a user
+  DELETE /admin/users/{user_id}               — permanently delete a user
+  GET    /admin/claims                        — list all claims
+  GET    /admin/claims/{claim_id}             — full claim detail
+  POST   /admin/claims/{claim_id}/assign      — assign officer to claim
+  GET    /admin/officers                      — list all officers
+  POST   /admin/officers                      — create officer account
+  GET    /admin/stats                         — dashboard statistics
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -21,6 +25,8 @@ from app.db.session import get_db
 from app.models.models import (
     AIAnalysis,
     Claim,
+    ClaimHistory,
+    ClaimImage,
     ClaimOfficer,
     ClaimStatus,
     Customer,
@@ -53,6 +59,19 @@ async def list_users(
     return result.scalars().all()
 
 
+@router.get("/users/{user_id}", response_model=AdminUserOut)
+async def get_user(
+    user_id: int,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return user
+
+
 @router.put("/users/{user_id}/deactivate", response_model=AdminUserOut)
 async def deactivate_user(
     user_id: int,
@@ -81,6 +100,77 @@ async def activate_user(
         raise HTTPException(status_code=404, detail="User not found.")
     user.is_active = True
     return user
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Permanently delete a user account.
+    Also deletes the linked customer profile and their vehicles/policies/claims
+    if it is a customer account.
+    Cannot delete your own account or the last remaining admin.
+    """
+    if user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account.")
+
+    result = await db.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Protect last admin
+    if user.role == UserRole.ADMIN:
+        admin_count = (await db.execute(
+            select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)
+        )).scalar()
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete the last admin account.",
+            )
+
+    # For customers: clean up related records to avoid FK violations
+    if user.role == UserRole.CUSTOMER and user.customer_id:
+        cid = user.customer_id
+        # Get all vehicles for this customer
+        veh_result = await db.execute(select(Vehicle).where(Vehicle.customer_id == cid))
+        vehicles = veh_result.scalars().all()
+        for v in vehicles:
+            # Get policies for this vehicle
+            pol_result = await db.execute(select(Policy).where(Policy.vehicle_id == v.vehicle_id))
+            policies = pol_result.scalars().all()
+            for p in policies:
+                # Delete claim history, images, ai analysis, then claims
+                claims_r = await db.execute(select(Claim).where(Claim.policy_id == p.policy_id))
+                claims = claims_r.scalars().all()
+                for c in claims:
+                    await db.execute(sql_delete(ClaimHistory).where(ClaimHistory.claim_id == c.claim_id))
+                    await db.execute(sql_delete(ClaimImage).where(ClaimImage.claim_id == c.claim_id))
+                    await db.execute(sql_delete(AIAnalysis).where(AIAnalysis.claim_id == c.claim_id))
+                await db.execute(sql_delete(Claim).where(Claim.policy_id == p.policy_id))
+                await db.execute(sql_delete(Policy).where(Policy.policy_id == p.policy_id))
+            await db.execute(sql_delete(Vehicle).where(Vehicle.vehicle_id == v.vehicle_id))
+        await db.execute(sql_delete(Customer).where(Customer.customer_id == cid))
+
+    # For officers: unassign their claims
+    if user.role == UserRole.CLAIM_OFFICER and user.officer_id:
+        oid = user.officer_id
+        claims_r = await db.execute(
+            select(Claim).where(Claim.assigned_officer_id == oid)
+        )
+        for c in claims_r.scalars().all():
+            c.assigned_officer_id = None
+        await db.execute(
+            sql_delete(ClaimHistory).where(ClaimHistory.officer_id == oid)
+        )
+        await db.execute(sql_delete(ClaimOfficer).where(ClaimOfficer.officer_id == oid))
+
+    await db.delete(user)
+    return None
 
 
 # ---------------------------------------------------------------------------

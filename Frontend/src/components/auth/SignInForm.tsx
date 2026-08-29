@@ -25,38 +25,25 @@ export default function SignInForm() {
 
     try {
       await login(email, password);
+      // Password accepted — backend sent a 2FA code to their email.
+      // Send them to the verify-login page to enter the code.
+      navigate(`/verify-login?email=${encodeURIComponent(email)}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
-        // Special case: account exists but email not verified yet
         if (err.message === "EMAIL_NOT_VERIFIED") {
           navigate(`/verify-email?email=${encodeURIComponent(email)}`);
           setLoading(false);
           return;
         }
         setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
       } else {
         setError("An unexpected error occurred. Please try again.");
       }
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Redirect by role
-    const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-    const raw = localStorage.getItem("auth_user");
-    const freshUser = raw ? JSON.parse(raw) : null;
-    const role = freshUser?.role;
-
-    const destination =
-      from ??
-      (role === "ADMIN"
-        ? "/admin"
-        : role === "CLAIM_OFFICER"
-          ? "/officer/claims"
-          : "/");
-
-    navigate(destination, { replace: true });
-    setLoading(false);
   };
 
   return (

@@ -66,6 +66,9 @@ class User(Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     verification_code: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
     code_expires_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    # Login 2FA
+    login_code: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    login_code_expires_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     customer_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("customer.customer_id", ondelete="SET NULL"), nullable=True
     )

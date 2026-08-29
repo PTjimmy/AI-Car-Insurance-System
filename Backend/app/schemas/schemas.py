@@ -46,6 +46,13 @@ class TokenResponse(BaseModel):
     full_name: str
 
 
+class LoginPendingResponse(BaseModel):
+    """Returned by /auth/login when 2FA code has been sent."""
+    requires_verification: bool = True
+    email: str
+    message: str
+
+
 # ===========================================================================
 # User / Profile
 # ===========================================================================

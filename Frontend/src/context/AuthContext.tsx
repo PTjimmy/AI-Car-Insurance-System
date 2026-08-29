@@ -94,14 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const token = await authApi.login(email, password);
-    saveSession(token);
-    setUser({
-      user_id: token.user_id,
-      email: token.email,
-      role: token.role,
-      full_name: token.full_name,
-    });
+    // Step 1 only — validates password and sends the 2FA code.
+    // Does NOT log the user in yet. The caller must redirect to /verify-login.
+    await authApi.login(email, password);
+    // Returns { requires_verification: true, email, message } — not a token.
   }, []);
 
   const register = useCallback(

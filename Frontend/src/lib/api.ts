@@ -236,8 +236,24 @@ export const authApi = {
   resendVerification: (email: string) =>
     post<{ message: string }>("/auth/resend-verification", { email }),
 
+  /** Step 1 of login 2FA — validates password, sends code, does NOT return a JWT */
   login: (email: string, password: string) =>
-    post<AuthToken>("/auth/login", { email, password }),
+    post<{ requires_verification: boolean; email: string; message: string }>(
+      "/auth/login", { email, password }
+    ),
+
+  /** Step 2 of login 2FA — validates code, returns the real JWT */
+  verifyLogin: (email: string, code: string) =>
+    post<AuthToken>("/auth/verify-login", { email, code }),
+
+  resendLoginCode: (email: string) =>
+    post<{ message: string }>("/auth/resend-login-code", { email }),
+
+  verifyEmail2: (email: string, code: string) =>
+    post<AuthToken>("/auth/verify-email", { email, code }),
+
+  resendVerification2: (email: string) =>
+    post<{ message: string }>("/auth/resend-verification", { email }),
 };
 
 // ---------------------------------------------------------------------------
@@ -300,8 +316,10 @@ export const officerApi = {
 export const adminApi = {
   getStats: () => get<AdminStats>("/admin/stats"),
   getUsers: () => get<AdminUser[]>("/admin/users"),
+  getUser: (id: number) => get<AdminUser>(`/admin/users/${id}`),
   deactivateUser: (id: number) => put<AdminUser>(`/admin/users/${id}/deactivate`, {}),
   activateUser: (id: number) => put<AdminUser>(`/admin/users/${id}/activate`, {}),
+  deleteUser: (id: number) => request<void>("DELETE", `/admin/users/${id}`),
 
   getClaims: () => get<Claim[]>("/admin/claims"),
   getClaim: (id: number) => get<Claim>(`/admin/claims/${id}`),

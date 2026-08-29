@@ -53,6 +53,20 @@ const officerNavItems: NavItem[] = [
 // Admin navigation
 const adminNavItems: NavItem[] = [
   { name: "Admin Dashboard", icon: <GridIcon />, path: "/admin" },
+  {
+    name: "User Management",
+    icon: <UserCircleIcon />,
+    subItems: [
+      { name: "All Users", path: "/admin/users" },
+    ],
+  },
+  {
+    name: "Claims",
+    icon: <PageIcon />,
+    subItems: [
+      { name: "All Claims", path: "/officer/claims" },
+    ],
+  },
 ];
 
 // Account items — shared

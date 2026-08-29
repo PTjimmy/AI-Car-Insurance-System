@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import VerifyEmail from "./pages/AuthPages/VerifyEmail";
+import VerifyLogin from "./pages/AuthPages/VerifyLogin";
 import NotFound from "./pages/OtherPage/NotFound";
 
 import UserProfiles from "./pages/UserProfiles";
@@ -27,6 +28,7 @@ import ClaimsOfficer from "./pages/Officer/ClaimsOfficer";
 import ClaimReview from "./pages/Officer/ClaimReview";
 
 import AdminDashboard from "./pages/Admin/AdminDashboard";
+import UserManagement from "./pages/Admin/UserManagement";
 
 import { AuthProvider } from "./context/AuthContext";
 import { ClaimsProvider } from "./context/ClaimsContext";
@@ -152,6 +154,14 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute roles={["ADMIN"]}>
+                    <UserManagement />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* ----- Shared: Profile / Settings ----- */}
               <Route
@@ -178,6 +188,7 @@ export default function App() {
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/verify-login" element={<VerifyLogin />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

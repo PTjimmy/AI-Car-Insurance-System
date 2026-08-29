@@ -1,11 +1,13 @@
 """
 Auth routes
 ===========
-POST /auth/register           — create customer account, send verification code
-POST /auth/verify-email       — submit 6-digit code, activate account
-POST /auth/resend-verification — resend a fresh code
-POST /auth/login              — login (blocked if not verified)
-GET  /auth/me                 — current user info
+POST /auth/register            — create customer account, send email verification code
+POST /auth/verify-email        — verify registration code → activate account
+POST /auth/resend-verification — resend registration code
+POST /auth/login               — validate password, send 2FA login code to email
+POST /auth/verify-login        — validate 2FA login code → return JWT
+POST /auth/resend-login-code   — resend 2FA login code
+GET  /auth/me                  — current user info (requires JWT)
 """
 
 import random
@@ -20,12 +22,19 @@ from app.core.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.models import ClaimOfficer, Customer, User, UserRole
-from app.schemas.schemas import LoginRequest, RegisterRequest, TokenResponse, UserOut
+from app.schemas.schemas import (
+    LoginRequest,
+    LoginPendingResponse,
+    RegisterRequest,
+    TokenResponse,
+    UserOut,
+)
 from app.services.email_service import send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-CODE_TTL_MINUTES = 15
+REGISTER_CODE_TTL = 15   # minutes
+LOGIN_CODE_TTL    = 10   # minutes — shorter for login
 
 
 # ---------------------------------------------------------------------------
@@ -33,12 +42,22 @@ CODE_TTL_MINUTES = 15
 # ---------------------------------------------------------------------------
 
 def _generate_code() -> str:
-    """Return a random 6-digit numeric string."""
     return "".join(random.choices(string.digits, k=6))
 
 
-def _code_expiry() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(minutes=CODE_TTL_MINUTES)
+def _now_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _expiry(minutes: int) -> datetime:
+    return (_now_naive() + timedelta(minutes=minutes))
+
+
+def _is_expired(expires_at: datetime | None) -> bool:
+    if expires_at is None:
+        return True
+    exp = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) > exp
 
 
 async def _resolve_full_name(user: User, db: AsyncSession) -> str:
@@ -65,12 +84,7 @@ async def _resolve_full_name(user: User, db: AsyncSession) -> str:
 
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    """
-    Create a new customer account.
-    Sends a 6-digit verification code to the provided email.
-    Account cannot be used until the code is verified.
-    """
-    # Email uniqueness check
+    """Create a new customer account and send email verification code."""
     existing = await db.execute(select(User).where(User.email == payload.email))
     if existing.scalar_one_or_none():
         raise HTTPException(
@@ -78,7 +92,6 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
             detail="An account with this email already exists.",
         )
 
-    # Create customer profile
     customer = Customer(
         first_name=payload.first_name,
         last_name=payload.last_name,
@@ -90,10 +103,7 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     db.add(customer)
     await db.flush()
 
-    # Generate verification code
     code = _generate_code()
-
-    # Create user auth row — NOT verified yet
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
@@ -101,12 +111,11 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
         customer_id=customer.customer_id,
         is_verified=False,
         verification_code=code,
-        code_expires_at=_code_expiry().replace(tzinfo=None),  # store naive UTC
+        code_expires_at=_expiry(REGISTER_CODE_TTL),
     )
     db.add(user)
     await db.flush()
 
-    # Send email (falls back to console log if SMTP not configured)
     full_name = f"{customer.first_name} {customer.last_name}"
     send_verification_email(payload.email, full_name, code)
 
@@ -118,17 +127,154 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 
 
 # ---------------------------------------------------------------------------
-# Verify email
+# Verify email (registration)
 # ---------------------------------------------------------------------------
 
 @router.post("/verify-email", response_model=TokenResponse)
-async def verify_email(
-    payload: dict,
-    db: AsyncSession = Depends(get_db),
-):
+async def verify_email(payload: dict, db: AsyncSession = Depends(get_db)):
+    """Confirm registration code. Activates account and returns JWT."""
+    email = payload.get("email", "").strip().lower()
+    code  = payload.get("code", "").strip()
+
+    if not email or not code:
+        raise HTTPException(status_code=422, detail="email and code are required.")
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+    if user.is_verified:
+        token = create_access_token({"sub": str(user.user_id)})
+        return TokenResponse(
+            access_token=token, user_id=user.user_id,
+            email=user.email, role=user.role,
+            full_name=await _resolve_full_name(user, db),
+        )
+
+    if not user.verification_code:
+        raise HTTPException(status_code=400, detail="No code found. Please request a new one.")
+    if _is_expired(user.code_expires_at):
+        raise HTTPException(status_code=400, detail="Code has expired. Please request a new one.")
+    if user.verification_code != code:
+        raise HTTPException(
+            status_code=400,
+            detail="Incorrect code. Please check your email and try again.",
+        )
+
+    user.is_verified = True
+    user.verification_code = None
+    user.code_expires_at = None
+
+    token = create_access_token({"sub": str(user.user_id)})
+    return TokenResponse(
+        access_token=token, user_id=user.user_id,
+        email=user.email, role=user.role,
+        full_name=await _resolve_full_name(user, db),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Resend registration verification
+# ---------------------------------------------------------------------------
+
+@router.post("/resend-verification", response_model=dict)
+async def resend_verification(payload: dict, db: AsyncSession = Depends(get_db)):
+    email = payload.get("email", "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=422, detail="email is required.")
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return {"message": "If an account exists for this email, a new code has been sent."}
+    if user.is_verified:
+        return {"message": "This account is already verified. You can log in."}
+
+    # Rate-limit: only resend if old code is expired
+    if user.code_expires_at and not _is_expired(user.code_expires_at):
+        exp = user.code_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        remaining = int((exp - datetime.now(timezone.utc)).total_seconds() // 60) + 1
+        raise HTTPException(
+            status_code=429,
+            detail=f"Please wait {remaining} minute(s) before requesting a new code.",
+        )
+
+    code = _generate_code()
+    user.verification_code = code
+    user.code_expires_at = _expiry(REGISTER_CODE_TTL)
+
+    full_name = user.email
+    if user.customer_id:
+        r = await db.execute(select(Customer).where(Customer.customer_id == user.customer_id))
+        c = r.scalar_one_or_none()
+        if c:
+            full_name = f"{c.first_name} {c.last_name}"
+
+    send_verification_email(email, full_name, code)
+    return {"message": "A new verification code has been sent to your email."}
+
+
+# ---------------------------------------------------------------------------
+# Login  (Step 1 of 2FA — validate password, send login code)
+# ---------------------------------------------------------------------------
+
+@router.post("/login", response_model=LoginPendingResponse)
+async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
-    Submit the 6-digit code.
-    On success: marks account verified and returns a JWT (user is now logged in).
+    Step 1 of 2-factor login.
+    Validates email + password, then sends a 6-digit code to the user's email.
+    Returns LoginPendingResponse — NOT a JWT yet.
+    Call POST /auth/verify-login with the code to get the real JWT.
+    """
+    result = await db.execute(select(User).where(User.email == payload.email))
+    user = result.scalar_one_or_none()
+
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive. Contact an administrator.",
+        )
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="EMAIL_NOT_VERIFIED",
+        )
+
+    # Generate and save login code
+    code = _generate_code()
+    user.login_code = code
+    user.login_code_expires_at = _expiry(LOGIN_CODE_TTL)
+
+    # Resolve display name for email
+    full_name = await _resolve_full_name(user, db)
+
+    # Send code
+    send_verification_email(payload.email, full_name, code)
+
+    return LoginPendingResponse(
+        email=payload.email,
+        message=f"A 6-digit login code has been sent to {payload.email}. It expires in {LOGIN_CODE_TTL} minutes.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Verify login (Step 2 of 2FA — validate code, return JWT)
+# ---------------------------------------------------------------------------
+
+@router.post("/verify-login", response_model=TokenResponse)
+async def verify_login(payload: dict, db: AsyncSession = Depends(get_db)):
+    """
+    Step 2 of 2-factor login.
+    Validates the 6-digit login code and returns the full JWT.
     """
     email = payload.get("email", "").strip().lower()
     code  = payload.get("code", "").strip()
@@ -142,71 +288,41 @@ async def verify_email(
     if not user:
         raise HTTPException(status_code=404, detail="Account not found.")
 
-    if user.is_verified:
-        # Already verified — just return a token
-        token = create_access_token({"sub": str(user.user_id)})
-        full_name = await _resolve_full_name(user, db)
-        return TokenResponse(
-            access_token=token,
-            user_id=user.user_id,
-            email=user.email,
-            role=user.role,
-            full_name=full_name,
-        )
-
-    # Check code exists
-    if not user.verification_code:
+    if not user.login_code:
         raise HTTPException(
             status_code=400,
-            detail="No verification code found. Please request a new one.",
+            detail="No login code found. Please go back and sign in again.",
         )
-
-    # Check expiry
-    if user.code_expires_at:
-        expires = user.code_expires_at
-        # Make timezone-aware for comparison
-        if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > expires:
-            raise HTTPException(
-                status_code=400,
-                detail="Verification code has expired. Please request a new one.",
-            )
-
-    # Check code matches
-    if user.verification_code != code:
+    if _is_expired(user.login_code_expires_at):
         raise HTTPException(
             status_code=400,
-            detail="Incorrect verification code. Please check your email and try again.",
+            detail="Login code has expired. Please sign in again.",
+        )
+    if user.login_code != code:
+        raise HTTPException(
+            status_code=400,
+            detail="Incorrect login code. Please check your email and try again.",
         )
 
-    # Activate account
-    user.is_verified = True
-    user.verification_code = None
-    user.code_expires_at = None
+    # Clear the used code
+    user.login_code = None
+    user.login_code_expires_at = None
 
     token = create_access_token({"sub": str(user.user_id)})
-    full_name = await _resolve_full_name(user, db)
-
     return TokenResponse(
-        access_token=token,
-        user_id=user.user_id,
-        email=user.email,
-        role=user.role,
-        full_name=full_name,
+        access_token=token, user_id=user.user_id,
+        email=user.email, role=user.role,
+        full_name=await _resolve_full_name(user, db),
     )
 
 
 # ---------------------------------------------------------------------------
-# Resend verification
+# Resend login code
 # ---------------------------------------------------------------------------
 
-@router.post("/resend-verification", response_model=dict)
-async def resend_verification(
-    payload: dict,
-    db: AsyncSession = Depends(get_db),
-):
-    """Generate and send a fresh 6-digit code."""
+@router.post("/resend-login-code", response_model=dict)
+async def resend_login_code(payload: dict, db: AsyncSession = Depends(get_db)):
+    """Resend a fresh login 2FA code. Rate-limited to once every 2 minutes."""
     email = payload.get("email", "").strip().lower()
     if not email:
         raise HTTPException(status_code=422, detail="email is required.")
@@ -215,83 +331,29 @@ async def resend_verification(
     user = result.scalar_one_or_none()
 
     if not user:
-        # Don't reveal whether account exists
         return {"message": "If an account exists for this email, a new code has been sent."}
 
-    if user.is_verified:
-        return {"message": "This account is already verified. You can log in."}
-
-    # Rate-limit: only resend if old code is expired or missing
-    if user.code_expires_at:
-        expires = user.code_expires_at
-        if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        remaining = (expires - datetime.now(timezone.utc)).total_seconds()
-        if remaining > 0:
-            mins = int(remaining // 60) + 1
+    # Rate-limit: 2-minute cooldown
+    if user.login_code_expires_at and not _is_expired(user.login_code_expires_at):
+        exp = user.login_code_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        remaining_secs = (exp - datetime.now(timezone.utc)).total_seconds()
+        # Allow resend only if more than (LOGIN_CODE_TTL - 2) minutes used
+        if remaining_secs > (LOGIN_CODE_TTL - 2) * 60:
             raise HTTPException(
                 status_code=429,
-                detail=f"A code was already sent. Please wait {mins} minute(s) before requesting a new one.",
+                detail="Please wait 2 minutes before requesting a new login code.",
             )
 
-    # Issue fresh code
     code = _generate_code()
-    user.verification_code = code
-    user.code_expires_at = _code_expiry().replace(tzinfo=None)
+    user.login_code = code
+    user.login_code_expires_at = _expiry(LOGIN_CODE_TTL)
 
-    # Resolve name for email
-    full_name = user.email
-    if user.customer_id:
-        r = await db.execute(
-            select(Customer).where(Customer.customer_id == user.customer_id)
-        )
-        c = r.scalar_one_or_none()
-        if c:
-            full_name = f"{c.first_name} {c.last_name}"
-
+    full_name = await _resolve_full_name(user, db)
     send_verification_email(email, full_name, code)
 
-    return {"message": "A new verification code has been sent to your email."}
-
-
-# ---------------------------------------------------------------------------
-# Login
-# ---------------------------------------------------------------------------
-
-@router.post("/login", response_model=TokenResponse)
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == payload.email))
-    user = result.scalar_one_or_none()
-
-    if user is None or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password.",
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive. Contact an administrator.",
-        )
-
-    # Block unverified customers
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="EMAIL_NOT_VERIFIED",
-        )
-
-    token = create_access_token({"sub": str(user.user_id)})
-    full_name = await _resolve_full_name(user, db)
-
-    return TokenResponse(
-        access_token=token,
-        user_id=user.user_id,
-        email=user.email,
-        role=user.role,
-        full_name=full_name,
-    )
+    return {"message": "A new login code has been sent to your email."}
 
 
 # ---------------------------------------------------------------------------
