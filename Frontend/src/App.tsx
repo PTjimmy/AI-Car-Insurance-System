@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
+import VerifyEmail from "./pages/AuthPages/VerifyEmail";
 import NotFound from "./pages/OtherPage/NotFound";
 
 import UserProfiles from "./pages/UserProfiles";
@@ -176,6 +177,7 @@ export default function App() {
             ============================================================ */}
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

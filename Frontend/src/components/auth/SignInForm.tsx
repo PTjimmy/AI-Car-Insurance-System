@@ -25,10 +25,14 @@ export default function SignInForm() {
 
     try {
       await login(email, password);
-      // After login the user object is set — redirect based on role
-      // We read the freshly-set user from the navigate callback below.
     } catch (err) {
       if (err instanceof ApiError) {
+        // Special case: account exists but email not verified yet
+        if (err.message === "EMAIL_NOT_VERIFIED") {
+          navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+          setLoading(false);
+          return;
+        }
         setError(err.message);
       } else {
         setError("An unexpected error occurred. Please try again.");
@@ -37,10 +41,8 @@ export default function SignInForm() {
       return;
     }
 
-    // Redirect: honour the "from" state set by ProtectedRoute, or default by role
+    // Redirect by role
     const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-
-    // Re-read user from localStorage since state update is async
     const raw = localStorage.getItem("auth_user");
     const freshUser = raw ? JSON.parse(raw) : null;
     const role = freshUser?.role;

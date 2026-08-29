@@ -38,7 +38,8 @@ export default function SignUpForm() {
         phone,
         password,
       });
-      navigate("/", { replace: true });
+      // Registration successful — send to verify-email page
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

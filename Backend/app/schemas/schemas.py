@@ -57,6 +57,7 @@ class UserOut(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    is_verified: bool
     created_at: datetime
     customer_id: Optional[int]
     officer_id: Optional[int]

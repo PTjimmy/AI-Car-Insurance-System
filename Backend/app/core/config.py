@@ -33,6 +33,18 @@ class Settings(BaseSettings):
     # CORS
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Email (Gmail SMTP)
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAIL_FROM: str = "InsureAI <noreply@insureai.com>"
+
+    @property
+    def email_configured(self) -> bool:
+        """True when real SMTP credentials are present."""
+        return bool(self.SMTP_USER and self.SMTP_PASSWORD and "your_gmail" not in self.SMTP_USER)
+
     @property
     def upload_dir_path(self) -> Path:
         p = Path(self.UPLOAD_DIR)

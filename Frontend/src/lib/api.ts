@@ -226,7 +226,15 @@ export const authApi = {
     phone: string;
     password: string;
     address?: string;
-  }) => post<AuthToken>("/auth/register", data),
+  }) => post<{ message: string; email: string; requires_verification: boolean }>(
+    "/auth/register", data
+  ),
+
+  verifyEmail: (email: string, code: string) =>
+    post<AuthToken>("/auth/verify-email", { email, code }),
+
+  resendVerification: (email: string) =>
+    post<{ message: string }>("/auth/resend-verification", { email }),
 
   login: (email: string, password: string) =>
     post<AuthToken>("/auth/login", { email, password }),

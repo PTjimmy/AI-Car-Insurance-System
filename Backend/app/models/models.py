@@ -62,6 +62,10 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Email verification
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    verification_code: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    code_expires_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     customer_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("customer.customer_id", ondelete="SET NULL"), nullable=True
     )

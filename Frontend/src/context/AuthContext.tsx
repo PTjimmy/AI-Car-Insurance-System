@@ -25,6 +25,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithToken: (token: AuthToken) => void;
   register: (data: {
     first_name: string;
     last_name: string;
@@ -112,17 +113,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: string;
       address?: string;
     }) => {
-      const token = await authApi.register(data);
-      saveSession(token);
-      setUser({
-        user_id: token.user_id,
-        email: token.email,
-        role: token.role,
-        full_name: token.full_name,
-      });
+      // Register now returns { message, email, requires_verification }
+      // NOT a token — the user must verify their email first.
+      // The caller (SignUpForm) handles the redirect to /verify-email.
+      await authApi.register(data);
     },
     []
   );
+
+  const loginWithToken = useCallback((token: AuthToken) => {
+    saveSession(token);
+    setUser({
+      user_id: token.user_id,
+      email: token.email,
+      role: token.role,
+      full_name: token.full_name,
+    });
+  }, []);
 
   const logout = useCallback(() => {
     clearSession();
@@ -135,10 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       isLoading,
       login,
+      loginWithToken,
       register,
       logout,
     }),
-    [user, isLoading, login, register, logout]
+    [user, isLoading, login, loginWithToken, register, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
