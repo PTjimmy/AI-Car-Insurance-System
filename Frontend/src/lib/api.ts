@@ -195,9 +195,21 @@ async function request<T>(
     let message = `HTTP ${res.status}`;
     try {
       const data = await res.json();
-      message = data?.detail ?? message;
+      if (typeof data?.detail === "string") {
+        // Standard FastAPI error: { "detail": "Some message" }
+        message = data.detail;
+      } else if (Array.isArray(data?.detail)) {
+        // Pydantic validation error: { "detail": [{ "msg": "...", "loc": [...] }] }
+        message = data.detail
+          .map((e: { msg?: string; loc?: string[] }) => {
+            const field = e.loc?.slice(1).join(" → ") ?? "";
+            const msg = e.msg?.replace(/^Value error,\s*/i, "") ?? "Invalid value";
+            return field ? `${field}: ${msg}` : msg;
+          })
+          .join(". ");
+      }
     } catch {
-      // ignore parse errors
+      // ignore JSON parse errors
     }
     throw new ApiError(res.status, message);
   }
@@ -248,12 +260,6 @@ export const authApi = {
 
   resendLoginCode: (email: string) =>
     post<{ message: string }>("/auth/resend-login-code", { email }),
-
-  verifyEmail2: (email: string, code: string) =>
-    post<AuthToken>("/auth/verify-email", { email, code }),
-
-  resendVerification2: (email: string) =>
-    post<{ message: string }>("/auth/resend-verification", { email }),
 };
 
 // ---------------------------------------------------------------------------
