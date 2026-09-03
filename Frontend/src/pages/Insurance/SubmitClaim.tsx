@@ -64,14 +64,11 @@ export default function SubmitClaim() {
   const coverageLimit = selectedPolicy?.policy_type?.coverage_limit ?? null;
   const policyName = selectedPolicy?.policy_type?.policy_name ?? "";
 
-  // ---- Client-side business rule checks ----
-  const coverageLimitWarning: string | null = (() => {
-    if (!coverageLimit || !claimedAmount) return null;
-    if (parseFloat(claimedAmount) > coverageLimit) {
-      return `Customer claimed amount exceeds the policy coverage limit of ₹${Number(coverageLimit).toLocaleString("en-IN")}. Please reduce the amount or select a higher-tier policy.`;
-    }
-    return null;
-  })();
+  // ---- Client-side checks ----
+  // NOTE: No client-side coverage_limit enforcement — the backend's
+  // claim_estimator applies the max_claim cap (Step 8 of calculation).
+  // Enforcing coverage_limit on the frontend would be contradictory.
+  const coverageLimitWarning: string | null = null;
 
   // DB-driven own-vehicle coverage check:
   // A policy covers own-vehicle damage when at least one per-severity
@@ -155,9 +152,14 @@ export default function SubmitClaim() {
               Claim Submitted Successfully
             </h1>
             <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
-              Your claim has been submitted. The AI model has analysed your damage images.
-              A Claims Officer will review the assessment and make the final decision.
+              Your claim has been submitted and is now pending officer assignment.
+              {files.length > 0 && " Your damage images have been saved."}
             </p>
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/5 dark:text-blue-400">
+              AI damage analysis will run automatically once an officer is assigned
+              and the model weights are available. If no AI result appears, the
+              officer will still review your claim and make a decision.
+            </div>
             <div className="mt-6 rounded-xl bg-slate-50 p-4 text-left dark:bg-white/[0.03]">
               <p className="text-xs text-gray-500 dark:text-gray-400">Claim Number</p>
               <p className="mt-1 font-semibold text-gray-900 dark:text-white">{submittedClaim.claim_number}</p>
@@ -225,9 +227,10 @@ export default function SubmitClaim() {
             <div>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">What happens after submission?</h2>
               <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                Your uploaded damage images are analysed by the ViT-B/16 AI model to estimate
-                damage severity (Minor / Moderate / Severe) and repair cost. A Claims Officer
-                reviews the AI assessment and makes the final decision.
+                When you upload damage images, the ViT-B/16 AI model will attempt to classify
+                the damage severity (Minor / Moderate / Severe) and calculate an estimated claim
+                amount based on your policy rules. AI analysis requires model weights to be
+                loaded — if unavailable, the Claims Officer will still review your claim.
               </p>
             </div>
           </div>
@@ -419,8 +422,10 @@ export default function SubmitClaim() {
               Upload Damage Images <span className="text-red-500">*</span>
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Upload clear photographs of the damaged vehicle. The AI model analyses each image
-              to classify damage severity.
+              Upload damage photographs for your claim. The <strong>first image</strong> is
+              used as the primary image for AI severity analysis. Additional images are stored
+              as supporting evidence for the officer's review but are not separately analysed
+              by the AI model.
             </p>
 
             <div className="mt-5 rounded-xl border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
@@ -514,7 +519,7 @@ export default function SubmitClaim() {
               disabled={submitting || files.length === 0 || policyId === "" || hasBlockingError}
               className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? "Submitting & running AI analysis…" : "Submit Claim for AI Assessment"}
+              {submitting ? "Submitting claim…" : "Submit Claim for Assessment"}
             </button>
           </div>
         </form>

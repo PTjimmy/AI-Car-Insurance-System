@@ -81,14 +81,16 @@ export default function InsuranceMetrics() {
         <h3 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
           {policiesLoading
             ? "—"
-            : nextPremium
+            : nextPremium != null
               ? `₹${nextPremium.toLocaleString("en-IN")}`
-              : "—"}
+              : "Not specified"}
         </h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {nextRenewal ? `Due ${formatDate(nextRenewal.end_date)}` : "No active policy"}
         </p>
-        <p className="mt-4 text-xs font-medium text-gray-400">Annual premium payment</p>
+        <p className="mt-4 text-xs font-medium text-gray-400">
+          {nextPremium != null ? "Annual premium payment" : "Premium not specified in prototype"}
+        </p>
       </div>
     </div>
   );

@@ -96,7 +96,9 @@ export default function PolicyCard() {
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">Annual Premium</p>
             <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-              ₹{active.policy_type?.annual_premium?.toLocaleString("en-IN") ?? "—"}
+              {active.policy_type?.annual_premium != null
+                ? `₹${active.policy_type.annual_premium.toLocaleString("en-IN")}`
+                : "Not specified in prototype"}
             </p>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">Policy active</p>

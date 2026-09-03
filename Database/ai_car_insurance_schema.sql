@@ -7,8 +7,8 @@
 --        createdb ai_car_insurance
 --   2. Run this file:
 --        psql -d ai_car_insurance -f ai_car_insurance_schema.sql
---   3. The schema will create all tables owned by the current
---      connected user — no hardcoded "postgres" role dependency.
+--   3. Schema is idempotent — safe to run on a fresh database.
+--      All tables owned by the connected user (no postgres role dependency).
 -- =============================================================
 
 SET statement_timeout = 0;
@@ -47,37 +47,29 @@ END $$;
 
 -- =============================================================
 -- TABLE: users
--- Central authentication table. All three roles authenticate
--- through this table. customer_id and officer_id are nullable
--- foreign keys that link to the role-specific profile tables.
+-- Central authentication table for all three roles.
+-- customer_id / officer_id are set after the profile row is created.
 -- =============================================================
 
 CREATE TABLE IF NOT EXISTS public.users (
-    user_id     bigint                      NOT NULL GENERATED ALWAYS AS IDENTITY
-                    (SEQUENCE NAME public.users_user_id_seq START WITH 1 INCREMENT BY 1),
-    email       character varying(100)      NOT NULL,
-    password_hash character varying(255)    NOT NULL,
-    role        public.user_role            NOT NULL DEFAULT 'CUSTOMER',
-    is_active   boolean                     NOT NULL DEFAULT true,
-    created_at  timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    user_id               bigint                      NOT NULL GENERATED ALWAYS AS IDENTITY
+                              (SEQUENCE NAME public.users_user_id_seq START WITH 1 INCREMENT BY 1),
+    email                 character varying(100)      NOT NULL,
+    password_hash         character varying(255)      NOT NULL,
+    role                  public.user_role            NOT NULL DEFAULT 'CUSTOMER',
+    is_active             boolean                     NOT NULL DEFAULT true,
+    created_at            timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Email registration verification
     is_verified           boolean                     NOT NULL DEFAULT false,
     verification_code     character varying(6),
     code_expires_at       timestamp without time zone,
-    -- Login 2FA code
+    -- Login 2FA
     login_code            character varying(6),
     login_code_expires_at timestamp without time zone,
-    -- Role-specific profile links (nullable FK, set after profile row created)
-    customer_id bigint,
-    officer_id  bigint,
-    CONSTRAINT users_pkey PRIMARY KEY (user_id),
-    CONSTRAINT users_email_key UNIQUE (email)
-);
-    created_at  timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    -- These are set after the profile row is created
-    customer_id bigint,
-    officer_id  bigint,
-    CONSTRAINT users_pkey PRIMARY KEY (user_id),
+    -- Role-specific profile links (nullable; set after profile row is created)
+    customer_id           bigint,
+    officer_id            bigint,
+    CONSTRAINT users_pkey      PRIMARY KEY (user_id),
     CONSTRAINT users_email_key UNIQUE (email)
 );
 
@@ -95,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.customer (
     address       text,
     created_at    timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status        character varying(20)       NOT NULL DEFAULT 'active',
-    CONSTRAINT customer_pkey PRIMARY KEY (customer_id),
+    CONSTRAINT customer_pkey      PRIMARY KEY (customer_id),
     CONSTRAINT customer_email_key UNIQUE (email)
 );
 
@@ -111,7 +103,7 @@ CREATE TABLE IF NOT EXISTS public.claim_officer (
     email       character varying(100)      NOT NULL,
     phone       character varying(20),
     status      character varying(20)       NOT NULL DEFAULT 'active',
-    CONSTRAINT claim_officer_pkey PRIMARY KEY (officer_id),
+    CONSTRAINT claim_officer_pkey      PRIMARY KEY (officer_id),
     CONSTRAINT claim_officer_email_key UNIQUE (email)
 );
 
@@ -129,33 +121,38 @@ CREATE TABLE IF NOT EXISTS public.vehicle (
     manufacturing_year  smallint                    NOT NULL,
     vehicle_value       numeric(12,2)               NOT NULL,
     created_at          timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT vehicle_pkey PRIMARY KEY (vehicle_id),
+    CONSTRAINT vehicle_pkey                    PRIMARY KEY (vehicle_id),
     CONSTRAINT vehicle_registration_number_key UNIQUE (registration_number)
 );
 
 -- =============================================================
 -- TABLE: policy_type
--- P001–P006 from RAG Policy Knowledge Base (academic prototype).
+-- P001-P006 from RAG Policy Knowledge Base (academic prototype).
 -- Per-severity coverage percentages, deductible, and max_claim
 -- are stored here so the backend — not the frontend — is the
 -- authoritative source for all policy calculations.
+-- annual_premium is NULL for P001-P006 because the prototype
+-- document does not specify annual premiums; do not invent values.
 -- =============================================================
 
 CREATE TABLE IF NOT EXISTS public.policy_type (
-    policy_type_id      bigint                      NOT NULL GENERATED ALWAYS AS IDENTITY
-                            (SEQUENCE NAME public.policy_type_policy_type_id_seq START WITH 1 INCREMENT BY 1),
-    policy_code         character varying(10),
-    policy_name         character varying(100)      NOT NULL,
-    annual_premium      numeric(12,2)               NOT NULL,
-    coverage_limit      numeric(12,2)               NOT NULL,
-    minor_coverage_pct  numeric(5,2),
+    policy_type_id        bigint                  NOT NULL GENERATED ALWAYS AS IDENTITY
+                              (SEQUENCE NAME public.policy_type_policy_type_id_seq START WITH 1 INCREMENT BY 1),
+    policy_code           character varying(10),
+    policy_name           character varying(100)  NOT NULL,
+    -- annual_premium: NULL for prototype policies where no premium is documented.
+    -- Legacy policies carry their original values.
+    annual_premium        numeric(12,2),
+    coverage_limit        numeric(12,2)            NOT NULL,
+    -- Per-severity coverage percentages from policy document
+    minor_coverage_pct    numeric(5,2),
     moderate_coverage_pct numeric(5,2),
-    severe_coverage_pct numeric(5,2),
-    deductible          numeric(12,2),
-    max_claim           numeric(12,2),
-    description         text,
-    is_active           boolean                     NOT NULL DEFAULT true,
-    CONSTRAINT policy_type_pkey PRIMARY KEY (policy_type_id),
+    severe_coverage_pct   numeric(5,2),
+    deductible            numeric(12,2),
+    max_claim             numeric(12,2),
+    description           text,
+    is_active             boolean                 NOT NULL DEFAULT true,
+    CONSTRAINT policy_type_pkey           PRIMARY KEY (policy_type_id),
     CONSTRAINT policy_type_policy_name_key UNIQUE (policy_name)
 );
 
@@ -164,12 +161,12 @@ CREATE TABLE IF NOT EXISTS public.policy_type (
 -- =============================================================
 
 CREATE TABLE IF NOT EXISTS public.coverage_type (
-    coverage_type_id bigint                     NOT NULL GENERATED ALWAYS AS IDENTITY
+    coverage_type_id bigint                 NOT NULL GENERATED ALWAYS AS IDENTITY
                          (SEQUENCE NAME public.coverage_type_coverage_type_id_seq START WITH 1 INCREMENT BY 1),
-    coverage_name    character varying(100)     NOT NULL,
+    coverage_name    character varying(100) NOT NULL,
     description      text,
-    is_active        boolean                    NOT NULL DEFAULT true,
-    CONSTRAINT coverage_type_pkey PRIMARY KEY (coverage_type_id),
+    is_active        boolean                NOT NULL DEFAULT true,
+    CONSTRAINT coverage_type_pkey           PRIMARY KEY (coverage_type_id),
     CONSTRAINT coverage_type_coverage_name_key UNIQUE (coverage_name)
 );
 
@@ -197,13 +194,12 @@ CREATE TABLE IF NOT EXISTS public.policy (
     end_date       date                        NOT NULL,
     status         character varying(20)       NOT NULL DEFAULT 'active',
     created_at     timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT policy_pkey PRIMARY KEY (policy_id),
+    CONSTRAINT policy_pkey             PRIMARY KEY (policy_id),
     CONSTRAINT policy_policy_number_key UNIQUE (policy_number)
 );
 
 -- =============================================================
 -- TABLE: claim
--- Added: assigned_officer_id, location, claim_type
 -- =============================================================
 
 CREATE TABLE IF NOT EXISTS public.claim (
@@ -217,12 +213,14 @@ CREATE TABLE IF NOT EXISTS public.claim (
     claim_type           character varying(50)       NOT NULL DEFAULT 'Vehicle Damage',
     location             character varying(200),
     description          text                        NOT NULL,
+    -- claimed_amount: customer-submitted repair cost estimate (Option B input).
+    -- Labelled in UI as "Customer Claimed Amount". NOT an AI prediction.
     claimed_amount       numeric(12,2)               NOT NULL,
     approved_amount      numeric(12,2),
     status               public.claim_status         NOT NULL DEFAULT 'Pending',
     decision_remarks     text,
     created_at           timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT claim_pkey PRIMARY KEY (claim_id),
+    CONSTRAINT claim_pkey             PRIMARY KEY (claim_id),
     CONSTRAINT claim_claim_number_key UNIQUE (claim_number)
 );
 
@@ -242,42 +240,54 @@ CREATE TABLE IF NOT EXISTS public.claim_image (
 
 -- =============================================================
 -- TABLE: ai_analysis
--- Stores ViT prediction (AI) and deterministic claim calculation
--- (business rule) separately.
 --
--- AI prediction fields (populated by ViT):
---   damage_severity, confidence_score, model_version, analyzed_at
+-- Field separation (see Backend/app/services/ for implementation):
 --
--- Business-rule fields (populated by claim_estimator.py):
---   coverage_pct_applied, deductible_applied, estimated_claim_amount
+--   AI prediction fields — populated by ViT inference (ai_inference.py):
+--     damage_severity    : "Minor" | "Moderate" | "Severe"
+--     confidence_score   : softmax probability 0.0-1.0
+--     model_version      : checkpoint identifier
+--     analyzed_at        : timestamp of inference
 --
--- Legacy fields (kept for backward compatibility, no longer
--- populated by predict()):
---   estimated_repair_cost, risk_level, fraud_score
+--   Business-rule fields — populated by claim_estimator.py:
+--     coverage_pct_applied   : % selected for the predicted severity
+--     deductible_applied     : deductible subtracted
+--     estimated_claim_amount : final after floor + max_claim cap
 --
--- Image strategy:
---   is_primary_image = true: this is the first uploaded image,
---   which is the one analysed by ViT. Subsequent images are
---   supporting evidence stored in claim_image but not re-analysed.
+--   Image strategy (Option B):
+--     is_primary_image = true  : FIRST uploaded image, analysed by ViT.
+--     is_primary_image = false : future use; currently always true.
+--     Subsequent images are stored in claim_image as supporting evidence
+--     and are NOT re-analysed. One ai_analysis row per claim.
+--
+--   Legacy fields — retained for backward compatibility only.
+--     NOT actively populated by the current system.
+--     estimated_repair_cost : was a hard-coded business rule, not AI output
+--     risk_level            : no documented business rule implemented
+--     fraud_score           : no fraud model; system does NOT perform
+--                             fraud detection
 -- =============================================================
 
 CREATE TABLE IF NOT EXISTS public.ai_analysis (
     analysis_id             bigint                      NOT NULL GENERATED ALWAYS AS IDENTITY
                                 (SEQUENCE NAME public.ai_analysis_analysis_id_seq START WITH 1 INCREMENT BY 1),
     claim_id                bigint                      NOT NULL,
+    -- AI prediction fields
     damage_severity         character varying(50),
     confidence_score        numeric(5,4),
+    model_version           character varying(50)       DEFAULT 'vit-b16-v1',
+    analyzed_at             timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    -- Business-rule calculation fields
     coverage_pct_applied    numeric(5,2),
     deductible_applied      numeric(12,2),
     estimated_claim_amount  numeric(12,2),
+    -- Image strategy marker
     is_primary_image        boolean                     NOT NULL DEFAULT true,
-    model_version           character varying(50)       DEFAULT 'vit-b16-v1',
-    analyzed_at             timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    -- Legacy columns — retained for backward compat, not actively populated
+    -- Legacy fields (backward compat; not actively populated)
     estimated_repair_cost   numeric(12,2),
     risk_level              character varying(30),
     fraud_score             numeric(5,4),
-    CONSTRAINT ai_analysis_pkey PRIMARY KEY (analysis_id),
+    CONSTRAINT ai_analysis_pkey         PRIMARY KEY (analysis_id),
     CONSTRAINT ai_analysis_claim_id_key UNIQUE (claim_id)
 );
 
@@ -298,81 +308,112 @@ CREATE TABLE IF NOT EXISTS public.claim_history (
 
 -- =============================================================
 -- FOREIGN KEY CONSTRAINTS
+-- NOTE: ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS is not valid
+-- standard PostgreSQL syntax. The constraints are defined inline
+-- in CREATE TABLE where possible; remaining FKs that cross tables
+-- are added here using DO blocks so they are idempotent.
 -- =============================================================
 
--- users → customer
-ALTER TABLE public.users
-    ADD CONSTRAINT IF NOT EXISTS fk_users_customer
-    FOREIGN KEY (customer_id) REFERENCES public.customer(customer_id)
-    ON DELETE SET NULL;
+DO $$ BEGIN
+    ALTER TABLE public.users
+        ADD CONSTRAINT fk_users_customer
+        FOREIGN KEY (customer_id) REFERENCES public.customer(customer_id)
+        ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- users → claim_officer
-ALTER TABLE public.users
-    ADD CONSTRAINT IF NOT EXISTS fk_users_officer
-    FOREIGN KEY (officer_id) REFERENCES public.claim_officer(officer_id)
-    ON DELETE SET NULL;
+DO $$ BEGIN
+    ALTER TABLE public.users
+        ADD CONSTRAINT fk_users_officer
+        FOREIGN KEY (officer_id) REFERENCES public.claim_officer(officer_id)
+        ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- vehicle → customer
-ALTER TABLE public.vehicle
-    ADD CONSTRAINT IF NOT EXISTS fk_vehicle_customer
-    FOREIGN KEY (customer_id) REFERENCES public.customer(customer_id);
+DO $$ BEGIN
+    ALTER TABLE public.vehicle
+        ADD CONSTRAINT fk_vehicle_customer
+        FOREIGN KEY (customer_id) REFERENCES public.customer(customer_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- policy → vehicle
-ALTER TABLE public.policy
-    ADD CONSTRAINT IF NOT EXISTS fk_policy_vehicle
-    FOREIGN KEY (vehicle_id) REFERENCES public.vehicle(vehicle_id);
+DO $$ BEGIN
+    ALTER TABLE public.policy
+        ADD CONSTRAINT fk_policy_vehicle
+        FOREIGN KEY (vehicle_id) REFERENCES public.vehicle(vehicle_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- policy → policy_type
-ALTER TABLE public.policy
-    ADD CONSTRAINT IF NOT EXISTS fk_policy_policy_type
-    FOREIGN KEY (policy_type_id) REFERENCES public.policy_type(policy_type_id);
+DO $$ BEGIN
+    ALTER TABLE public.policy
+        ADD CONSTRAINT fk_policy_policy_type
+        FOREIGN KEY (policy_type_id) REFERENCES public.policy_type(policy_type_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- policy_coverage → policy_type
-ALTER TABLE public.policy_coverage
-    ADD CONSTRAINT IF NOT EXISTS fk_policy_coverage_policy_type
-    FOREIGN KEY (policy_type_id) REFERENCES public.policy_type(policy_type_id);
+DO $$ BEGIN
+    ALTER TABLE public.policy_coverage
+        ADD CONSTRAINT fk_policy_coverage_policy_type
+        FOREIGN KEY (policy_type_id) REFERENCES public.policy_type(policy_type_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- policy_coverage → coverage_type
-ALTER TABLE public.policy_coverage
-    ADD CONSTRAINT IF NOT EXISTS fk_policy_coverage_coverage_type
-    FOREIGN KEY (coverage_type_id) REFERENCES public.coverage_type(coverage_type_id);
+DO $$ BEGIN
+    ALTER TABLE public.policy_coverage
+        ADD CONSTRAINT fk_policy_coverage_coverage_type
+        FOREIGN KEY (coverage_type_id) REFERENCES public.coverage_type(coverage_type_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- claim → policy
-ALTER TABLE public.claim
-    ADD CONSTRAINT IF NOT EXISTS fk_claim_policy
-    FOREIGN KEY (policy_id) REFERENCES public.policy(policy_id);
+DO $$ BEGIN
+    ALTER TABLE public.claim
+        ADD CONSTRAINT fk_claim_policy
+        FOREIGN KEY (policy_id) REFERENCES public.policy(policy_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- claim → claim_officer (assigned officer, nullable)
-ALTER TABLE public.claim
-    ADD CONSTRAINT IF NOT EXISTS fk_claim_assigned_officer
-    FOREIGN KEY (assigned_officer_id) REFERENCES public.claim_officer(officer_id)
-    ON DELETE SET NULL;
+DO $$ BEGIN
+    ALTER TABLE public.claim
+        ADD CONSTRAINT fk_claim_assigned_officer
+        FOREIGN KEY (assigned_officer_id) REFERENCES public.claim_officer(officer_id)
+        ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- claim_image → claim
-ALTER TABLE public.claim_image
-    ADD CONSTRAINT IF NOT EXISTS fk_claim_image_claim
-    FOREIGN KEY (claim_id) REFERENCES public.claim(claim_id);
+DO $$ BEGIN
+    ALTER TABLE public.claim_image
+        ADD CONSTRAINT fk_claim_image_claim
+        FOREIGN KEY (claim_id) REFERENCES public.claim(claim_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- ai_analysis → claim
-ALTER TABLE public.ai_analysis
-    ADD CONSTRAINT IF NOT EXISTS fk_ai_analysis_claim
-    FOREIGN KEY (claim_id) REFERENCES public.claim(claim_id);
+DO $$ BEGIN
+    ALTER TABLE public.ai_analysis
+        ADD CONSTRAINT fk_ai_analysis_claim
+        FOREIGN KEY (claim_id) REFERENCES public.claim(claim_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- claim_history → claim
-ALTER TABLE public.claim_history
-    ADD CONSTRAINT IF NOT EXISTS fk_claim_history_claim
-    FOREIGN KEY (claim_id) REFERENCES public.claim(claim_id);
+DO $$ BEGIN
+    ALTER TABLE public.claim_history
+        ADD CONSTRAINT fk_claim_history_claim
+        FOREIGN KEY (claim_id) REFERENCES public.claim(claim_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
--- claim_history → claim_officer
-ALTER TABLE public.claim_history
-    ADD CONSTRAINT IF NOT EXISTS fk_claim_history_officer
-    FOREIGN KEY (officer_id) REFERENCES public.claim_officer(officer_id);
+DO $$ BEGIN
+    ALTER TABLE public.claim_history
+        ADD CONSTRAINT fk_claim_history_officer
+        FOREIGN KEY (officer_id) REFERENCES public.claim_officer(officer_id);
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- =============================================================
--- SEED DATA: P001–P006 from RAG Policy Knowledge Base
---            They are not real insurance products or legal terms.
---            annual_premium is 0.00 — the document does not specify
---            annual premiums for P001–P006 so none are invented.
+-- SEED DATA: P001-P006 from RAG Policy Knowledge Base
+-- IMPORTANT: Synthetic policies for an academic/prototype project.
+-- These are NOT real insurance products, legal terms, or actual
+-- insurer pricing. annual_premium is NULL because the document
+-- does not specify annual premiums — no values are invented.
 -- =============================================================
 
 INSERT INTO public.policy_type (
@@ -383,35 +424,55 @@ INSERT INTO public.policy_type (
     description, is_active
 )
 VALUES
-  ('P001','Basic Comprehensive',
-   0.00,100000.00, 80.00,75.00,70.00, 5000.00,100000.00,
-   'Covers accidental own-vehicle damage. Minor: 80%, Moderate: 75%, Severe: 70%. Deductible ₹5,000. Maximum claim ₹1,00,000. Cosmetic damage unrelated to an accident is excluded. [Prototype — synthetic policy, not a real insurance product]',
+  ('P001', 'Basic Comprehensive',
+   NULL, 100000.00,
+   80.00, 75.00, 70.00, 5000.00, 100000.00,
+   'Covers accidental own-vehicle damage. Minor: 80%, Moderate: 75%, Severe: 70%. '
+   'Deductible ₹5,000. Maximum claim ₹1,00,000. '
+   'Cosmetic damage unrelated to an accident is excluded. '
+   '[Prototype — synthetic policy, not a real insurance product]',
    true),
-  ('P002','Standard Comprehensive',
-   0.00,150000.00, 85.00,80.00,75.00, 5000.00,150000.00,
-   'Covers accidental damage. Minor: 85%, Moderate: 80%, Severe: 75%. Deductible ₹5,000. Maximum claim ₹1,50,000. Pre-existing and intentional damage excluded. [Prototype — synthetic policy, not a real insurance product]',
+
+  ('P002', 'Standard Comprehensive',
+   NULL, 150000.00,
+   85.00, 80.00, 75.00, 5000.00, 150000.00,
+   'Covers accidental damage. Minor: 85%, Moderate: 80%, Severe: 75%. '
+   'Deductible ₹5,000. Maximum claim ₹1,50,000. '
+   'Pre-existing and intentional damage excluded. '
+   '[Prototype — synthetic policy, not a real insurance product]',
    true),
-  ('P003','Premium Comprehensive',
-   0.00,300000.00, 90.00,90.00,85.00, 2000.00,300000.00,
-   'Higher coverage for accidental damage. Minor: 90%, Moderate: 90%, Severe: 85%. Deductible ₹2,000. Maximum claim ₹3,00,000. [Prototype — synthetic policy, not a real insurance product]',
+
+  ('P003', 'Premium Comprehensive',
+   NULL, 300000.00,
+   90.00, 90.00, 85.00, 2000.00, 300000.00,
+   'Higher coverage for accidental damage. Minor: 90%, Moderate: 90%, Severe: 85%. '
+   'Deductible ₹2,000. Maximum claim ₹3,00,000. '
+   '[Prototype — synthetic policy, not a real insurance product]',
    true),
-  ('P004','Zero Depreciation',
-   0.00,500000.00, 95.00,95.00,90.00, 2000.00,500000.00,
-   'Minor/Moderate: 95%, Severe: 90%. Deductible ₹2,000. Maximum claim ₹5,00,000. [Prototype — synthetic policy, not a real insurance product]',
+
+  ('P004', 'Zero Depreciation',
+   NULL, 500000.00,
+   95.00, 95.00, 90.00, 2000.00, 500000.00,
+   'Minor/Moderate: 95%, Severe: 90%. Deductible ₹2,000. Maximum claim ₹5,00,000. '
+   '[Prototype — synthetic policy, not a real insurance product]',
    true),
-  ('P005','Budget Own-Damage',
-   0.00,100000.00, 75.00,70.00,65.00, 7500.00,100000.00,
-   'Lower-cost own-damage. Minor: 75%, Moderate: 70%, Severe: 65%. Deductible ₹7,500. Maximum claim ₹1,00,000. [Prototype — synthetic policy, not a real insurance product]',
+
+  ('P005', 'Budget Own-Damage',
+   NULL, 100000.00,
+   75.00, 70.00, 65.00, 7500.00, 100000.00,
+   'Lower-cost own-damage. Minor: 75%, Moderate: 70%, Severe: 65%. '
+   'Deductible ₹7,500. Maximum claim ₹1,00,000. '
+   '[Prototype — synthetic policy, not a real insurance product]',
    true),
-  ('P006','Enhanced Protection',
-   0.00,400000.00, 90.00,88.00,85.00, 3000.00,400000.00,
-   'Extended accidental-damage coverage. Minor: 90%, Moderate: 88%, Severe: 85%. Deductible ₹3,000. Maximum claim ₹4,00,000. [Prototype — synthetic policy, not a real insurance product]',
+
+  ('P006', 'Enhanced Protection',
+   NULL, 400000.00,
+   90.00, 88.00, 85.00, 3000.00, 400000.00,
+   'Extended accidental-damage coverage. Minor: 90%, Moderate: 88%, Severe: 85%. '
+   'Deductible ₹3,000. Maximum claim ₹4,00,000. '
+   '[Prototype — synthetic policy, not a real insurance product]',
    true)
 ON CONFLICT (policy_name) DO NOTHING;
-
--- coverage_type rows are no longer seeded here.
--- The RAG Policy Knowledge Base does not define coverage_type catalogue rows.
--- Do not invent values not present in the policy document.
 
 -- =============================================================
 -- END OF SCHEMA

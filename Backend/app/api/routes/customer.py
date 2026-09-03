@@ -257,7 +257,7 @@ async def list_policy_types(
                 policy_type_id=plan.policy_type_id,
                 policy_code=plan.policy_code,
                 policy_name=plan.policy_name,
-                annual_premium=float(plan.annual_premium),
+                annual_premium=float(plan.annual_premium) if plan.annual_premium is not None else None,
                 coverage_limit=float(plan.coverage_limit),
                 minor_coverage_pct=float(plan.minor_coverage_pct) if plan.minor_coverage_pct is not None else None,
                 moderate_coverage_pct=float(plan.moderate_coverage_pct) if plan.moderate_coverage_pct is not None else None,
@@ -473,18 +473,14 @@ async def submit_claim(
             detail="Cannot submit a claim — this policy has expired.",
         )
 
-    # Rule 3: claimed_amount must not exceed coverage_limit
-    coverage_limit = float(policy.policy_type.coverage_limit) if policy.policy_type else 0
-    if payload.claimed_amount > coverage_limit:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Customer claimed amount ₹{payload.claimed_amount:,.0f} exceeds "
-                f"the policy coverage limit of ₹{coverage_limit:,.0f}."
-            ),
-        )
+    # NOTE: No pre-validation of claimed_amount against coverage_limit here.
+    # The claim_estimator enforces the max_claim cap (Step 8) after applying
+    # the coverage percentage and deductible. Rejecting claimed_amount > coverage_limit
+    # before the calculation would prevent the documented Step 8 cap from working
+    # and could incorrectly block valid claims on policies with high claimed amounts.
+    # coverage_limit is retained on the policy_type table for display/legacy use only.
 
-    # Rule 4: DB-driven own-vehicle damage coverage check
+    # DB-driven own-vehicle damage coverage check
     if (
         policy.policy_type is not None
         and payload.claim_type in _OWN_DAMAGE_CLAIM_TYPES

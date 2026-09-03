@@ -155,7 +155,9 @@ class PolicyType(Base):
     policy_type_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     policy_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     policy_name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    annual_premium: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    # annual_premium: NULL for P001-P006 prototype policies where no premium
+    # is documented. Do not display ₹0 as if insurance is free.
+    annual_premium: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     coverage_limit: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     # Per-severity coverage percentages (from RAG policy document P001–P006)
     minor_coverage_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)

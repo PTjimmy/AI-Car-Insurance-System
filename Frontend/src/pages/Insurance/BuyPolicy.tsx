@@ -176,10 +176,23 @@ export default function BuyPolicy() {
 
                 {/* Price */}
                 <div className="mt-5">
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                    ₹{Number(plan.annual_premium).toLocaleString("en-IN")}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">per year</p>
+                  {plan.annual_premium != null ? (
+                    <>
+                      <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                        ₹{Number(plan.annual_premium).toLocaleString("en-IN")}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">per year</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-base font-semibold text-gray-500 dark:text-gray-400">
+                        Not specified in prototype
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                        Annual premium not documented
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Coverage limit */}
@@ -306,7 +319,9 @@ export default function BuyPolicy() {
                 <div className="flex justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
                   <span className="font-semibold text-gray-700 dark:text-gray-300">Annual Premium</span>
                   <span className="font-bold text-blue-600 dark:text-blue-400">
-                    ₹{Number(selectedPlan.annual_premium).toLocaleString("en-IN")}
+                    {selectedPlan.annual_premium != null
+                      ? `₹${Number(selectedPlan.annual_premium).toLocaleString("en-IN")}/yr`
+                      : "Not specified in prototype"}
                   </span>
                 </div>
               </div>
@@ -327,7 +342,11 @@ export default function BuyPolicy() {
                 disabled={purchasing || vehicleId === ""}
                 className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {purchasing ? "Processing…" : `Confirm — ₹${Number(selectedPlan.annual_premium).toLocaleString("en-IN")}/yr`}
+                {purchasing
+                  ? "Processing…"
+                  : selectedPlan.annual_premium != null
+                    ? `Confirm — ₹${Number(selectedPlan.annual_premium).toLocaleString("en-IN")}/yr`
+                    : "Confirm Purchase"}
               </button>
             </div>
           </div>

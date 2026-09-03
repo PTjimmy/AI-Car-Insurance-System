@@ -115,8 +115,9 @@ export default function Policies() {
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Annual Premium</p>
                     <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                      ₹{policyType?.annual_premium?.toLocaleString("en-IN") ?? "—"}
-                      <span className="text-sm font-normal text-gray-500"> / year</span>
+                      {policyType?.annual_premium != null
+                        ? <>₹{policyType.annual_premium.toLocaleString("en-IN")}<span className="text-sm font-normal text-gray-500"> / year</span></>
+                        : <span className="text-sm font-normal text-gray-500">Not specified in prototype</span>}
                     </p>
                   </div>
                   <div>

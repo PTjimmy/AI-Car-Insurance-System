@@ -62,7 +62,12 @@ export interface PolicyType {
   /** Policy code from RAG document: P001–P006 */
   policy_code: string | null;
   policy_name: string;
-  annual_premium: number;
+  /**
+   * annual_premium is NULL for P001-P006 prototype policies.
+   * The RAG Policy Knowledge Base document does not specify annual premiums.
+   * Display as "Not specified in prototype" when null — never show ₹0.
+   */
+  annual_premium: number | null;
   coverage_limit: number;
   /** Per-severity coverage percentages (business rule — from policy_type DB row) */
   minor_coverage_pct: number | null;

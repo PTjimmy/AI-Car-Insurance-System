@@ -266,6 +266,8 @@ export default function ClaimReview() {
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Submitted Images</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Damage evidence uploaded by the customer.
+              The first image was used for AI severity analysis; additional images are
+              supporting evidence.
             </p>
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
               {claim.images.map((img) => {

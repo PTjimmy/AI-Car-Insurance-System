@@ -148,17 +148,17 @@ class VehicleOut(BaseModel):
 class PolicyTypeOut(BaseModel):
     """
     Basic policy type information.
-    Includes per-severity coverage percentages, deductible, and max_claim
-    so the frontend can display policy rules without hard-coding them.
+    annual_premium is Optional — prototype policies (P001-P006) do not
+    specify an annual premium in the policy document. Display as
+    "Not specified in prototype" when NULL, never as ₹0.
     """
     model_config = {"from_attributes": True}
 
     policy_type_id: int
     policy_code: Optional[str]
     policy_name: str
-    annual_premium: float
+    annual_premium: Optional[float]   # NULL for P001-P006 prototype plans
     coverage_limit: float
-    # Per-severity coverage percentages (from P001–P006 policy document)
     minor_coverage_pct: Optional[float]
     moderate_coverage_pct: Optional[float]
     severe_coverage_pct: Optional[float]
@@ -171,14 +171,14 @@ class PolicyTypeOut(BaseModel):
 class PolicyTypeDetailOut(BaseModel):
     """
     Policy type with coverage names list (for Buy Policy page).
-    Includes all calculation fields so the frontend can display them.
+    annual_premium is Optional — see PolicyTypeOut note above.
     """
     model_config = {"from_attributes": True}
 
     policy_type_id: int
     policy_code: Optional[str]
     policy_name: str
-    annual_premium: float
+    annual_premium: Optional[float]   # NULL for P001-P006 prototype plans
     coverage_limit: float
     minor_coverage_pct: Optional[float]
     moderate_coverage_pct: Optional[float]
