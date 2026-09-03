@@ -6,7 +6,10 @@ import { useClaims } from "../../context/ClaimsContext";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-// Claim types that represent own-vehicle damage (checked against Third Party policy)
+// Claim types that represent damage to the customer's own vehicle.
+// This is used only to show a client-side warning note.
+// The authoritative coverage check is performed by the backend
+// (customer.py _policy_covers_own_vehicle) using the policy_type DB row.
 const OWN_DAMAGE_TYPES = new Set([
   "Vehicle Damage",
   "Own Vehicle Damage",
@@ -15,8 +18,6 @@ const OWN_DAMAGE_TYPES = new Set([
   "Flood",
   "Fire",
 ]);
-
-const THIRD_PARTY_ONLY = "Third Party Insurance";
 
 function policyExpiryWarning(policy: Policy): string | null {
   if (!policy.end_date) return null;
@@ -67,15 +68,26 @@ export default function SubmitClaim() {
   const coverageLimitWarning: string | null = (() => {
     if (!coverageLimit || !claimedAmount) return null;
     if (parseFloat(claimedAmount) > coverageLimit) {
-      return `Claimed amount exceeds the coverage limit of ₹${Number(coverageLimit).toLocaleString("en-IN")}. Please reduce the amount or select a higher-tier policy.`;
+      return `Customer claimed amount exceeds the policy coverage limit of ₹${Number(coverageLimit).toLocaleString("en-IN")}. Please reduce the amount or select a higher-tier policy.`;
     }
     return null;
   })();
 
+  // DB-driven own-vehicle coverage check:
+  // A policy covers own-vehicle damage when at least one per-severity
+  // coverage percentage is present and > 0. This mirrors the backend logic
+  // in customer.py _policy_covers_own_vehicle().
+  const policyCoversOwnVehicle: boolean = (() => {
+    if (!selectedPolicy?.policy_type) return true; // assume covered if unknown
+    const pt = selectedPolicy.policy_type;
+    return [pt.minor_coverage_pct, pt.moderate_coverage_pct, pt.severe_coverage_pct]
+      .some((pct) => pct != null && pct > 0);
+  })();
+
   const notCoveredWarning: string | null = (() => {
     if (!selectedPolicy) return null;
-    if (policyName === THIRD_PARTY_ONLY && OWN_DAMAGE_TYPES.has(claimType)) {
-      return "Not Covered Under Selected Policy — Third Party Insurance does not cover damage to your own vehicle. Switch to Comprehensive or Premium Plus for own-vehicle damage claims.";
+    if (!policyCoversOwnVehicle && OWN_DAMAGE_TYPES.has(claimType)) {
+      return `Not Covered Under Selected Policy — "${selectedPolicy.policy_type?.policy_name}" does not cover own-vehicle damage. Please select a policy with own-vehicle damage coverage.`;
     }
     return null;
   })();
@@ -336,7 +348,7 @@ export default function SubmitClaim() {
               {/* Claimed Amount */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Claimed Amount (₹) <span className="text-red-500">*</span>
+                  Customer Claimed Amount (₹) <span className="text-red-500">*</span>
                   {coverageLimit && (
                     <span className="ml-2 font-normal text-gray-400">
                       max ₹{Number(coverageLimit).toLocaleString("en-IN")}

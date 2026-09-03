@@ -118,38 +118,54 @@ export default function Claims() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">AI Damage Severity</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Damage Severity
+                    <span className="ml-1 text-blue-500 dark:text-blue-400">(AI)</span>
+                  </p>
                   <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
                     {claim.ai_analysis?.damage_severity ?? "Pending analysis"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Estimated Repair Cost</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Customer Claimed Amount
+                  </p>
                   <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
-                    {claim.ai_analysis?.estimated_repair_cost != null
-                      ? `₹${claim.ai_analysis.estimated_repair_cost.toLocaleString("en-IN")}`
-                      : "—"}
+                    ₹{claim.claimed_amount.toLocaleString("en-IN")}
                   </p>
                 </div>
               </div>
 
-              {/* AI Assessment */}
+              {/* AI + Policy Calculation */}
               {claim.ai_analysis && (
                 <div className="mt-6 rounded-xl bg-slate-50 p-4 dark:bg-white/[0.03]">
                   <div className="flex items-start gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">
                       AI
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        AI Assessment · {Math.round((claim.ai_analysis.confidence_score ?? 0) * 100)}% confidence
+                        AI Prediction · {Math.round((claim.ai_analysis.confidence_score ?? 0) * 100)}% confidence
                       </p>
                       <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
                         Damage classified as{" "}
-                        <strong>{claim.ai_analysis.damage_severity}</strong> with estimated repair cost of{" "}
-                        ₹{claim.ai_analysis.estimated_repair_cost?.toLocaleString("en-IN") ?? "—"}.
-                        Risk level: {claim.ai_analysis.risk_level ?? "—"}.
+                        <strong>{claim.ai_analysis.damage_severity}</strong>.
                       </p>
+                      {claim.ai_analysis.estimated_claim_amount != null && (
+                        <div className="mt-3 rounded-lg border border-green-100 bg-green-50 px-3 py-2 dark:border-green-500/20 dark:bg-green-500/5">
+                          <p className="text-xs font-medium text-green-700 dark:text-green-400">
+                            Policy Calculation
+                          </p>
+                          <p className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-white">
+                            Estimated Claim: ₹{claim.ai_analysis.estimated_claim_amount.toLocaleString("en-IN")}
+                          </p>
+                          {claim.ai_analysis.coverage_pct_applied != null && (
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              {claim.ai_analysis.coverage_pct_applied}% of ₹{claim.claimed_amount.toLocaleString("en-IN")} − ₹{claim.ai_analysis.deductible_applied?.toLocaleString("en-IN")} deductible
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

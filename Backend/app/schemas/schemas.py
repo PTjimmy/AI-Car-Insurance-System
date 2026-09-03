@@ -1,5 +1,20 @@
 """
 Pydantic v2 schemas for request/response validation.
+
+Field labelling convention used throughout:
+  damage_severity, confidence_score, model_version
+      → AI prediction fields (ViT output only)
+
+  coverage_pct_applied, deductible_applied, estimated_claim_amount
+      → Business-rule / policy calculation fields (claim_estimator.py)
+
+  claimed_amount
+      → Customer-submitted repair estimate (Option B input)
+        Labelled in UI as "Customer Claimed Amount" — NOT an AI prediction.
+
+  fraud_score, risk_level, estimated_repair_cost
+      → Legacy fields kept for backward compatibility.
+        Not actively populated. Excluded from new display schemas.
 """
 
 from __future__ import annotations
@@ -131,24 +146,45 @@ class VehicleOut(BaseModel):
 # ===========================================================================
 
 class PolicyTypeOut(BaseModel):
+    """
+    Basic policy type information.
+    Includes per-severity coverage percentages, deductible, and max_claim
+    so the frontend can display policy rules without hard-coding them.
+    """
     model_config = {"from_attributes": True}
 
     policy_type_id: int
+    policy_code: Optional[str]
     policy_name: str
     annual_premium: float
     coverage_limit: float
+    # Per-severity coverage percentages (from P001–P006 policy document)
+    minor_coverage_pct: Optional[float]
+    moderate_coverage_pct: Optional[float]
+    severe_coverage_pct: Optional[float]
+    deductible: Optional[float]
+    max_claim: Optional[float]
     description: Optional[str]
     is_active: bool
 
 
 class PolicyTypeDetailOut(BaseModel):
-    """Policy type with its coverage names list."""
+    """
+    Policy type with coverage names list (for Buy Policy page).
+    Includes all calculation fields so the frontend can display them.
+    """
     model_config = {"from_attributes": True}
 
     policy_type_id: int
+    policy_code: Optional[str]
     policy_name: str
     annual_premium: float
     coverage_limit: float
+    minor_coverage_pct: Optional[float]
+    moderate_coverage_pct: Optional[float]
+    severe_coverage_pct: Optional[float]
+    deductible: Optional[float]
+    max_claim: Optional[float]
     description: Optional[str]
     is_active: bool
     coverages: List[str] = []
@@ -178,6 +214,23 @@ class PolicyOut(BaseModel):
 
 # ===========================================================================
 # AI Analysis
+#
+# Field labelling — enforced in API response so the frontend can
+# distinguish AI outputs from business-rule outputs:
+#
+#   AI prediction (ViT):
+#     damage_severity, confidence_score, model_version, analyzed_at
+#
+#   Business-rule calculation (claim_estimator.py):
+#     coverage_pct_applied, deductible_applied, estimated_claim_amount
+#
+#   Image strategy:
+#     is_primary_image — True if this analysis is for the first/primary
+#     image. Always True for the single ai_analysis row per claim.
+#
+#   Legacy (backward compat, not actively populated):
+#     estimated_repair_cost, risk_level, fraud_score
+#     Omitted from this schema — they are not displayed in the UI.
 # ===========================================================================
 
 class AIAnalysisOut(BaseModel):
@@ -185,13 +238,25 @@ class AIAnalysisOut(BaseModel):
 
     analysis_id: int
     claim_id: int
-    damage_severity: Optional[str]
-    confidence_score: Optional[float]
-    estimated_repair_cost: Optional[float]
-    risk_level: Optional[str]
-    fraud_score: Optional[float]
+
+    # --- AI prediction fields ---
+    damage_severity: Optional[str]       # "Minor" | "Moderate" | "Severe"
+    confidence_score: Optional[float]    # 0.0 – 1.0
+
+    # --- Business-rule calculation fields ---
+    coverage_pct_applied: Optional[float]    # e.g. 90.0 (%)
+    deductible_applied: Optional[float]      # e.g. 2000.0 (₹)
+    estimated_claim_amount: Optional[float]  # final after deductible + max cap (₹)
+
+    # --- Metadata ---
+    is_primary_image: bool
     model_version: Optional[str]
     analyzed_at: datetime
+
+    # Legacy fields excluded intentionally:
+    #   estimated_repair_cost — was a hard-coded business rule, not AI
+    #   risk_level            — removed (no documented rule)
+    #   fraud_score           — removed (no fraud model)
 
 
 # ===========================================================================
@@ -233,7 +298,7 @@ class ClaimCreate(BaseModel):
     claim_type: str = "Vehicle Damage"
     location: Optional[str] = None
     description: str
-    claimed_amount: float
+    claimed_amount: float  # Customer-submitted repair estimate (Option B input)
 
 
 class ClaimStatusUpdate(BaseModel):
@@ -254,7 +319,7 @@ class ClaimOut(BaseModel):
     claim_type: str
     location: Optional[str]
     description: str
-    claimed_amount: float
+    claimed_amount: float       # Customer-submitted repair estimate
     approved_amount: Optional[float]
     status: ClaimStatus
     decision_remarks: Optional[str]

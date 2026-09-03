@@ -152,10 +152,21 @@ export default function ClaimsOfficer() {
                         </p>
                       </div>
                       <div className="rounded-xl bg-slate-50 p-4 dark:bg-white/[0.03]">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Estimated Repair</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Customer Claimed Amount
+                        </p>
                         <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
-                          {claim.ai_analysis?.estimated_repair_cost != null
-                            ? `₹${claim.ai_analysis.estimated_repair_cost.toLocaleString("en-IN")}`
+                          ₹{claim.claimed_amount.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-4 dark:bg-white/[0.03]">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Est. Claim
+                          <span className="ml-1 text-green-500 dark:text-green-400">(Calc.)</span>
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                          {claim.ai_analysis?.estimated_claim_amount != null
+                            ? `₹${claim.ai_analysis.estimated_claim_amount.toLocaleString("en-IN")}`
                             : "—"}
                         </p>
                       </div>

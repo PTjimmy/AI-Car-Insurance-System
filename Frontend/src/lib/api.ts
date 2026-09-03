@@ -59,12 +59,22 @@ export interface Vehicle {
 
 export interface PolicyType {
   policy_type_id: number;
+  /** Policy code from RAG document: P001–P006 */
+  policy_code: string | null;
   policy_name: string;
   annual_premium: number;
   coverage_limit: number;
+  /** Per-severity coverage percentages (business rule — from policy_type DB row) */
+  minor_coverage_pct: number | null;
+  moderate_coverage_pct: number | null;
+  severe_coverage_pct: number | null;
+  /** Deductible amount in ₹ (business rule) */
+  deductible: number | null;
+  /** Maximum claim payable in ₹ (business rule) */
+  max_claim: number | null;
   description: string | null;
   is_active: boolean;
-  /** Coverage names included in this plan (from PolicyTypeDetailOut) */
+  /** Coverage names included in this plan (for display on Buy Policy page) */
   coverages?: string[];
 }
 
@@ -81,14 +91,42 @@ export interface Policy {
   vehicle: Vehicle | null;
 }
 
+/**
+ * AIAnalysis — field labelling mirrors backend separation.
+ *
+ * AI prediction fields (produced by ViT model):
+ *   damage_severity, confidence_score, model_version, analyzed_at
+ *
+ * Business-rule calculation fields (produced by claim_estimator.py):
+ *   coverage_pct_applied, deductible_applied, estimated_claim_amount
+ *
+ * Image strategy: is_primary_image = true for the FIRST uploaded image
+ *   which is the one analysed by ViT. Subsequent images are stored as
+ *   supporting evidence and are NOT re-analysed (Option B).
+ *
+ * Removed from this interface (legacy, no longer populated):
+ *   estimated_repair_cost — was a hard-coded business rule, not AI output
+ *   risk_level            — removed (no documented rule)
+ *   fraud_score           — removed (no fraud model)
+ */
 export interface AIAnalysis {
   analysis_id: number;
   claim_id: number;
+
+  /** AI prediction — ViT damage severity classification */
   damage_severity: string | null;
+  /** AI prediction — softmax confidence (0.0–1.0) */
   confidence_score: number | null;
-  estimated_repair_cost: number | null;
-  risk_level: string | null;
-  fraud_score: number | null;
+
+  /** Business rule — coverage % selected for this severity from policy */
+  coverage_pct_applied: number | null;
+  /** Business rule — deductible amount subtracted (₹) */
+  deductible_applied: number | null;
+  /** Business rule — final estimated claim amount after calculation (₹) */
+  estimated_claim_amount: number | null;
+
+  /** True for the primary (first) image; always true per claim (Option B) */
+  is_primary_image: boolean;
   model_version: string | null;
   analyzed_at: string;
 }

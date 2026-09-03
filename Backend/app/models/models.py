@@ -153,9 +153,16 @@ class PolicyType(Base):
     __tablename__ = "policy_type"
 
     policy_type_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    policy_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     policy_name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     annual_premium: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     coverage_limit: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    # Per-severity coverage percentages (from RAG policy document P001–P006)
+    minor_coverage_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    moderate_coverage_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    severe_coverage_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    deductible: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    max_claim: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
@@ -286,6 +293,22 @@ class ClaimImage(Base):
 
 # ---------------------------------------------------------------------------
 # AIAnalysis
+#
+# Field separation:
+#   AI prediction (populated by ViT inference service):
+#     damage_severity, confidence_score, model_version, analyzed_at
+#
+#   Business-rule calculation (populated by claim_estimator.py):
+#     coverage_pct_applied, deductible_applied, estimated_claim_amount
+#
+#   Image strategy — Option B:
+#     is_primary_image: True for the FIRST uploaded image which is the
+#     one analysed by ViT. All subsequent images are stored in claim_image
+#     as supporting evidence but are NOT re-analysed. There is exactly one
+#     ai_analysis row per claim.
+#
+#   Legacy columns (kept for backward compatibility, no longer populated):
+#     estimated_repair_cost, risk_level, fraud_score
 # ---------------------------------------------------------------------------
 
 class AIAnalysis(Base):
@@ -295,13 +318,21 @@ class AIAnalysis(Base):
     claim_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("claim.claim_id"), unique=True, nullable=False
     )
+    # --- AI prediction fields (ViT only) ---
     damage_severity: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Numeric(5, 4), nullable=True)
+    model_version: Mapped[str] = mapped_column(String(50), default="vit-b16-v1")
+    analyzed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # --- Business-rule calculation fields (claim_estimator.py) ---
+    coverage_pct_applied: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    deductible_applied: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    estimated_claim_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    # --- Image strategy marker ---
+    is_primary_image: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # --- Legacy columns (backward compat only, not actively populated) ---
     estimated_repair_cost: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     risk_level: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     fraud_score: Mapped[Optional[float]] = mapped_column(Numeric(5, 4), nullable=True)
-    model_version: Mapped[str] = mapped_column(String(50), default="vit-b16-v1")
-    analyzed_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     claim: Mapped["Claim"] = relationship("Claim", back_populates="ai_analysis")
 

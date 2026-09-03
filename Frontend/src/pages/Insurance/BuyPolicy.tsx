@@ -91,19 +91,26 @@ export default function BuyPolicy() {
     }
   };
 
-  const planColors: Record<string, { border: string; badge: string }> = {
-    "Third Party Insurance": {
-      border: "border-slate-200 dark:border-gray-700",
-      badge: "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-gray-300",
-    },
-    "Comprehensive Insurance": {
-      border: "border-blue-200 dark:border-blue-500/30",
-      badge: "bg-blue-600 text-white",
-    },
-    "Premium Plus": {
-      border: "border-amber-200 dark:border-amber-500/30",
-      badge: "bg-amber-500 text-white",
-    },
+  // Card styling derived from policy_code (P001–P006) rather than policy name,
+  // so adding new policies never breaks the UI. Unknown codes fall back to the
+  // default "entry" tier styling.
+  const getPlanColors = (policyCode: string | null): { border: string; badge: string } => {
+    switch (policyCode) {
+      case "P001":
+        return { border: "border-slate-200 dark:border-gray-700", badge: "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-gray-300" };
+      case "P002":
+        return { border: "border-blue-200 dark:border-blue-500/30", badge: "bg-blue-600 text-white" };
+      case "P003":
+        return { border: "border-indigo-200 dark:border-indigo-500/30", badge: "bg-indigo-600 text-white" };
+      case "P004":
+        return { border: "border-amber-200 dark:border-amber-500/30", badge: "bg-amber-500 text-white" };
+      case "P005":
+        return { border: "border-gray-200 dark:border-gray-700", badge: "bg-gray-500 text-white" };
+      case "P006":
+        return { border: "border-purple-200 dark:border-purple-500/30", badge: "bg-purple-600 text-white" };
+      default:
+        return { border: "border-gray-200 dark:border-gray-700", badge: "bg-gray-600 text-white" };
+    }
   };
 
   if (loading) {
@@ -138,7 +145,7 @@ export default function BuyPolicy() {
         {/* Plan cards */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {plans.map((plan) => {
-            const colors = planColors[plan.policy_name] ?? planColors["Third Party Insurance"];
+            const colors = getPlanColors(plan.policy_code ?? null);
             const isSelected = selectedPlan?.policy_type_id === plan.policy_type_id;
             const coverages = plan.coverages ?? [];
 
@@ -333,9 +340,10 @@ export default function BuyPolicy() {
             <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Important</h3>
               <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                Third Party Insurance does not cover damage to your own vehicle. Choose
-                Comprehensive or Premium Plus if you want own-vehicle damage coverage.
-                Each vehicle can hold only one active policy at a time.
+                Policies marked with coverage percentages for Minor, Moderate, and Severe damage
+                cover own-vehicle damage. Policies with no coverage percentages set only cover
+                third-party liability. Each vehicle can hold only one active policy at a time.
+                These are prototype policies — not real insurance products.
               </p>
             </div>
           </div>

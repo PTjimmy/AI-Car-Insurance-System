@@ -152,7 +152,7 @@ export default function ClaimDetails() {
               { label: "Claim Type", value: claim.claim_type },
               { label: "Incident Date", value: formatDate(claim.accident_date) },
               { label: "Location", value: claim.location ?? "—" },
-              { label: "Claimed Amount", value: `₹${claim.claimed_amount.toLocaleString("en-IN")}` },
+              { label: "Customer Claimed Amount", value: `₹${claim.claimed_amount.toLocaleString("en-IN")}` },
               {
                 label: "Approved Amount",
                 value: claim.approved_amount != null
@@ -174,42 +174,90 @@ export default function ClaimDetails() {
           )}
         </div>
 
-        {/* AI Assessment */}
+        {/* AI Assessment + Policy Calculation */}
         <div className="rounded-2xl border border-blue-200 bg-white p-6 shadow-sm dark:border-blue-500/20 dark:bg-gray-900">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white">AI</div>
             <div>
               <h2 className="text-base font-semibold text-gray-900 dark:text-white">InsureAI Damage Assessment</h2>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {ai ? "AI-generated assessment based on submitted images." : "Upload images to trigger the AI analysis."}
+                {ai ? "ViT-B/16 model prediction based on the primary damage image." : "Upload images to trigger the AI analysis."}
               </p>
             </div>
           </div>
 
           {ai ? (
             <>
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="rounded-xl bg-slate-50 p-4 dark:bg-white/[0.03]">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Damage Severity</p>
-                  <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{ai.damage_severity}</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-4 dark:bg-white/[0.03]">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">AI Confidence</p>
-                  <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
-                    {Math.round((ai.confidence_score ?? 0) * 100)}%
-                  </p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-4 dark:bg-white/[0.03]">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Estimated Repair Cost</p>
-                  <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
-                    ₹{ai.estimated_repair_cost?.toLocaleString("en-IN") ?? "—"}
-                  </p>
+              {/* AI Prediction block */}
+              <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                  AI Prediction — ViT-B/16
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Damage Severity</p>
+                    <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
+                      {ai.damage_severity}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">AI Confidence</p>
+                    <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
+                      {Math.round((ai.confidence_score ?? 0) * 100)}%
+                    </p>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-500/20">
+                      <div
+                        className="h-full rounded-full bg-blue-600"
+                        style={{ width: `${Math.round((ai.confidence_score ?? 0) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="mt-5 rounded-xl border border-gray-100 p-4 dark:border-gray-800">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Risk Level</p>
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{ai.risk_level ?? "—"}</p>
-              </div>
+
+              {/* Policy Calculation block */}
+              {ai.estimated_claim_amount != null ? (
+                <div className="mt-4 rounded-xl border border-green-100 bg-green-50 p-4 dark:border-green-500/20 dark:bg-green-500/5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-green-600 dark:text-green-400">
+                    Policy Calculation — Business Rule
+                  </p>
+                  <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Customer Claimed Amount</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                        ₹{claim.claimed_amount.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Coverage Applied
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                        {ai.coverage_pct_applied != null ? `${ai.coverage_pct_applied}%` : "—"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                        Deductible: ₹{ai.deductible_applied?.toLocaleString("en-IN") ?? "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Estimated Claim Amount</p>
+                      <p className="mt-1 text-xl font-semibold text-green-700 dark:text-green-400">
+                        ₹{ai.estimated_claim_amount.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                    Formula: (Customer Claimed Amount × Coverage %) − Deductible, capped at policy maximum.
+                    This is a prototype estimate. The Claims Officer makes the final decision.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-3 dark:border-amber-500/20 dark:bg-amber-500/5">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Policy calculation pending — policy rules may not be fully configured for this plan.
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <p className="mt-4 text-sm text-amber-600 dark:text-amber-400">

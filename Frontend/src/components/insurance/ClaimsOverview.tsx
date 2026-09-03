@@ -118,8 +118,12 @@ export default function ClaimsOverview() {
 
         {ai ? (
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* AI Prediction */}
             <div className="rounded-lg bg-white/70 p-4 dark:bg-white/[0.03]">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Damage Severity</p>
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                AI Prediction
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Damage Severity</p>
               <p className="mt-1 text-xl font-semibold text-gray-800 dark:text-white/90">
                 {ai.damage_severity ?? "—"}
               </p>
@@ -132,14 +136,24 @@ export default function ClaimsOverview() {
                 </div>
               )}
             </div>
+            {/* Policy Calculation */}
             <div className="rounded-lg bg-white/70 p-4 dark:bg-white/[0.03]">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Estimated Repair Cost</p>
+              <p className="text-xs font-medium text-green-600 dark:text-green-400">
+                Policy Calculation
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Estimated Claim Amount
+              </p>
               <p className="mt-1 text-xl font-semibold text-gray-800 dark:text-white/90">
-                {ai.estimated_repair_cost != null
-                  ? `₹${ai.estimated_repair_cost.toLocaleString("en-IN")}`
+                {ai.estimated_claim_amount != null
+                  ? `₹${ai.estimated_claim_amount.toLocaleString("en-IN")}`
                   : "—"}
               </p>
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">AI estimate</p>
+              {ai.coverage_pct_applied != null && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {ai.coverage_pct_applied}% coverage − ₹{ai.deductible_applied?.toLocaleString("en-IN")} deductible
+                </p>
+              )}
             </div>
           </div>
         ) : (
