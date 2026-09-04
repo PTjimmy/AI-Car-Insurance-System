@@ -19,8 +19,8 @@ export default function Vehicles() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Form fields
-  const [reg, setReg] = useState("");
+  // Form fields — registration_number is NOT entered by the customer;
+  // the backend auto-generates INS-VEH-YYYY-NNNNN
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
@@ -38,7 +38,7 @@ export default function Vehicles() {
   useEffect(() => { load(); }, []);
 
   const resetForm = () => {
-    setReg(""); setMake(""); setModel(""); setYear(""); setValue("");
+    setMake(""); setModel(""); setYear(""); setValue("");
     setError(null); setSuccess(null);
   };
 
@@ -48,14 +48,16 @@ export default function Vehicles() {
     setSuccess(null);
     setSubmitting(true);
     try {
-      await customerApi.createVehicle({
-        registration_number: reg.toUpperCase().trim(),
+      const created = await customerApi.createVehicle({
         make,
         model,
         manufacturing_year: parseInt(year),
         vehicle_value: parseFloat(value),
       });
-      setSuccess(`${make} ${model} registered successfully.`);
+      setSuccess(
+        `${make} ${model} registered. ` +
+        `InsureAI Vehicle ID: ${created.registration_number}`
+      );
       setShowForm(false);
       resetForm();
       load();
@@ -104,8 +106,20 @@ export default function Vehicles() {
               Register a New Vehicle
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Enter the details exactly as they appear on the vehicle registration certificate (RC).
+              Enter your vehicle details. An InsureAI Vehicle Reference ID will be
+              generated automatically — you do not need to enter a registration number.
             </p>
+
+            {/* System-generated ID notice */}
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 dark:border-blue-500/20 dark:bg-blue-500/5">
+              <span className="mt-0.5 text-blue-500 dark:text-blue-400">ℹ</span>
+              <p className="text-xs leading-5 text-blue-700 dark:text-blue-300">
+                The system will assign a unique <strong>InsureAI Vehicle ID</strong> (e.g.{" "}
+                <code className="rounded bg-blue-100 px-1 dark:bg-blue-500/20">INS-VEH-2026-00001</code>)
+                when your vehicle is registered. This is a system reference number only —
+                not an official government or RTO registration.
+              </p>
+            </div>
 
             {error && (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/5 dark:text-red-400">
@@ -114,21 +128,6 @@ export default function Vehicles() {
             )}
 
             <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
-              {/* Registration Number */}
-              <div className="sm:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Registration Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. GJ06AB1234"
-                  value={reg}
-                  onChange={(e) => setReg(e.target.value)}
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm uppercase text-gray-800 outline-none placeholder:normal-case placeholder:text-gray-400 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                />
-              </div>
-
               {/* Make */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -241,14 +240,19 @@ export default function Vehicles() {
                 key={v.vehicle_id}
                 className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
               >
-                {/* Vehicle icon + reg */}
+                {/* Icon + InsureAI Vehicle ID */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xl dark:bg-blue-500/10">
                     🚗
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-gray-300">
-                    {v.registration_number}
-                  </span>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                      InsureAI Vehicle ID
+                    </p>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-gray-300">
+                      {v.registration_number}
+                    </span>
+                  </div>
                 </div>
 
                 <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-white">
@@ -293,11 +297,14 @@ export default function Vehicles() {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Each vehicle can have one active policy
+                Each vehicle gets a unique InsureAI Vehicle ID
               </h3>
               <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                Register your vehicle first, then purchase an insurance plan. Once insured, you
-                can submit claims for that vehicle.
+                When you register a vehicle, the system automatically assigns a unique
+                InsureAI Vehicle Reference ID (e.g. INS-VEH-2026-00001). This is used
+                to link your vehicle to policies and claims within InsureAI. It is not
+                an official government or RTO registration number.
+                Each vehicle can hold only one active insurance policy at a time.
               </p>
             </div>
           </div>

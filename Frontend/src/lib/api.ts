@@ -316,8 +316,12 @@ export const customerApi = {
     put<CustomerProfile>("/customer/profile", data),
 
   getVehicles: () => get<Vehicle[]>("/customer/vehicles"),
-  createVehicle: (data: Omit<Vehicle, "vehicle_id" | "customer_id" | "created_at">) =>
-    post<Vehicle>("/customer/vehicles", data),
+  createVehicle: (data: {
+    make: string;
+    model: string;
+    manufacturing_year: number;
+    vehicle_value: number;
+  }) => post<Vehicle>("/customer/vehicles", data),
 
   getPolicyTypes: () => get<PolicyType[]>("/customer/policy-types"),
   getPolicies: () => get<Policy[]>("/customer/policies"),

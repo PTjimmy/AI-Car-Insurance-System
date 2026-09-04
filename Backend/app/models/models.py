@@ -134,7 +134,7 @@ class Vehicle(Base):
     customer_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("customer.customer_id"), nullable=False
     )
-    registration_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    registration_number: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
     make: Mapped[str] = mapped_column(String(50), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
     manufacturing_year: Mapped[int] = mapped_column(SmallInteger, nullable=False)

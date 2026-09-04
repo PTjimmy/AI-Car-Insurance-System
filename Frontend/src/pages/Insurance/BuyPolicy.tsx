@@ -3,43 +3,6 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { customerApi, type PolicyType, type Vehicle, ApiError } from "../../lib/api";
 
-// Coverage names that belong to each tier — used for the "Not Included" row
-const TIER_ORDER = [
-  "Third Party Liability",
-  "Own Vehicle Damage",
-  "Fire Damage",
-  "Theft",
-  "Flood",
-  "Cyclone / Natural Disaster",
-  "Roadside Assistance",
-  "Engine Protection",
-  "Zero Depreciation",
-  "Glass Replacement",
-];
-
-function CoverageRow({ label, included }: { label: string; included: boolean }) {
-  return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-gray-100 last:border-0 dark:border-gray-800">
-      <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-          included
-            ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400"
-            : "bg-red-50 text-red-400 dark:bg-red-500/5 dark:text-red-500"
-        }`}
-      >
-        {included ? "✓" : "✗"}
-      </span>
-      <span
-        className={`text-sm ${
-          included ? "text-gray-800 dark:text-white/90" : "text-gray-400 dark:text-gray-500 line-through"
-        }`}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
-
 export default function BuyPolicy() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -65,10 +28,7 @@ export default function BuyPolicy() {
 
   useEffect(() => {
     Promise.all([customerApi.getPolicyTypes(), customerApi.getVehicles()])
-      .then(([p, v]) => {
-        setPlans(p);
-        setVehicles(v);
-      })
+      .then(([p, v]) => { setPlans(p); setVehicles(v); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -91,25 +51,16 @@ export default function BuyPolicy() {
     }
   };
 
-  // Card styling derived from policy_code (P001–P006) rather than policy name,
-  // so adding new policies never breaks the UI. Unknown codes fall back to the
-  // default "entry" tier styling.
-  const getPlanColors = (policyCode: string | null): { border: string; badge: string } => {
-    switch (policyCode) {
-      case "P001":
-        return { border: "border-slate-200 dark:border-gray-700", badge: "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-gray-300" };
-      case "P002":
-        return { border: "border-blue-200 dark:border-blue-500/30", badge: "bg-blue-600 text-white" };
-      case "P003":
-        return { border: "border-indigo-200 dark:border-indigo-500/30", badge: "bg-indigo-600 text-white" };
-      case "P004":
-        return { border: "border-amber-200 dark:border-amber-500/30", badge: "bg-amber-500 text-white" };
-      case "P005":
-        return { border: "border-gray-200 dark:border-gray-700", badge: "bg-gray-500 text-white" };
-      case "P006":
-        return { border: "border-purple-200 dark:border-purple-500/30", badge: "bg-purple-600 text-white" };
-      default:
-        return { border: "border-gray-200 dark:border-gray-700", badge: "bg-gray-600 text-white" };
+  // Card styling keyed on policy_code (P001–P006) — never on policy name.
+  const getPlanColors = (code: string | null): { border: string; badge: string } => {
+    switch (code) {
+      case "P001": return { border: "border-slate-200 dark:border-gray-700",   badge: "bg-slate-600 text-white" };
+      case "P002": return { border: "border-blue-200 dark:border-blue-500/30",   badge: "bg-blue-600 text-white" };
+      case "P003": return { border: "border-indigo-200 dark:border-indigo-500/30", badge: "bg-indigo-600 text-white" };
+      case "P004": return { border: "border-amber-200 dark:border-amber-500/30",  badge: "bg-amber-500 text-white" };
+      case "P005": return { border: "border-gray-200 dark:border-gray-700",       badge: "bg-gray-500 text-white" };
+      case "P006": return { border: "border-purple-200 dark:border-purple-500/30", badge: "bg-purple-600 text-white" };
+      default:     return { border: "border-gray-200 dark:border-gray-700",       badge: "bg-gray-600 text-white" };
     }
   };
 
@@ -147,7 +98,6 @@ export default function BuyPolicy() {
           {plans.map((plan) => {
             const colors = getPlanColors(plan.policy_code ?? null);
             const isSelected = selectedPlan?.policy_type_id === plan.policy_type_id;
-            const coverages = plan.coverages ?? [];
 
             return (
               <button
@@ -155,18 +105,14 @@ export default function BuyPolicy() {
                 type="button"
                 onClick={() => setSelectedPlan(plan)}
                 className={`rounded-2xl border-2 bg-white p-6 text-left shadow-sm transition hover:shadow-md dark:bg-gray-900 ${
-                  isSelected
-                    ? "border-blue-500 shadow-blue-100 dark:shadow-none"
-                    : colors.border
+                  isSelected ? "border-blue-500 shadow-blue-100 dark:shadow-none" : colors.border
                 }`}
               >
                 {/* Plan header */}
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${colors.badge}`}>
-                      {plan.policy_name}
-                    </span>
-                  </div>
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${colors.badge}`}>
+                    {plan.policy_code ? `${plan.policy_code} · ` : ""}{plan.policy_name}
+                  </span>
                   {isSelected && (
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs text-white">
                       ✓
@@ -174,7 +120,7 @@ export default function BuyPolicy() {
                   )}
                 </div>
 
-                {/* Price */}
+                {/* Annual premium */}
                 <div className="mt-5">
                   {plan.annual_premium != null ? (
                     <>
@@ -188,35 +134,62 @@ export default function BuyPolicy() {
                       <p className="text-base font-semibold text-gray-500 dark:text-gray-400">
                         Not specified in prototype
                       </p>
-                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                        Annual premium not documented
-                      </p>
+                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Annual premium not documented</p>
                     </>
                   )}
                 </div>
 
-                {/* Coverage limit */}
-                <div className="mt-3 rounded-lg bg-slate-50 px-4 py-3 dark:bg-white/[0.03]">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Coverage Limit</p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
-                    ₹{Number(plan.coverage_limit).toLocaleString("en-IN")}
-                  </p>
+                {/* Documented policy details — from DB, no hard-coded coverage lists */}
+                <div className="mt-4 space-y-2">
+                  {/* Per-severity coverage percentages */}
+                  {(plan.minor_coverage_pct != null ||
+                    plan.moderate_coverage_pct != null ||
+                    plan.severe_coverage_pct != null) && (
+                    <div className="rounded-lg bg-blue-50 px-3 py-3 dark:bg-blue-500/5">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                        Coverage %
+                      </p>
+                      <div className="grid grid-cols-3 gap-1 text-center">
+                        {[
+                          { label: "Minor",    pct: plan.minor_coverage_pct },
+                          { label: "Moderate", pct: plan.moderate_coverage_pct },
+                          { label: "Severe",   pct: plan.severe_coverage_pct },
+                        ].map(({ label, pct }) => (
+                          <div key={label} className="rounded bg-white/70 p-1.5 dark:bg-white/5">
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400">{label}</p>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">
+                              {pct != null ? `${pct}%` : "—"}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Deductible + Maximum Claim */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.03]">
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400">Deductible</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-white">
+                        {plan.deductible != null
+                          ? `₹${Number(plan.deductible).toLocaleString("en-IN")}`
+                          : "—"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.03]">
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400">Maximum Claim</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-white">
+                        {plan.max_claim != null
+                          ? `₹${Number(plan.max_claim).toLocaleString("en-IN")}`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Coverage list */}
-                <div className="mt-5">
-                  {TIER_ORDER.map((coverage) => (
-                    <CoverageRow
-                      key={coverage}
-                      label={coverage}
-                      included={coverages.includes(coverage)}
-                    />
-                  ))}
-                </div>
-
-                {/* Description */}
+                {/* Description / exclusions */}
                 {plan.description && (
-                  <p className="mt-4 text-xs leading-5 text-gray-400 dark:text-gray-500">
+                  <p className="mt-3 text-xs leading-5 text-gray-400 dark:text-gray-500">
                     {plan.description}
                   </p>
                 )}
@@ -225,7 +198,7 @@ export default function BuyPolicy() {
           })}
         </div>
 
-        {/* Purchase form — shown after selecting a plan */}
+        {/* Purchase form */}
         {selectedPlan && (
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
@@ -250,9 +223,7 @@ export default function BuyPolicy() {
                 {vehicles.length === 0 ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-400">
                     No vehicles registered.{" "}
-                    <Link to="/vehicles" className="font-medium underline">
-                      Register a vehicle first
-                    </Link>
+                    <Link to="/vehicles" className="font-medium underline">Register a vehicle first</Link>
                   </div>
                 ) : (
                   <select
@@ -276,10 +247,7 @@ export default function BuyPolicy() {
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Start Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  required
-                  value={startDate}
+                <input type="date" required value={startDate}
                   min={new Date().toISOString().split("T")[0]}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
@@ -291,18 +259,14 @@ export default function BuyPolicy() {
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   End Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  required
-                  value={endDate}
-                  min={startDate}
+                <input type="date" required value={endDate} min={startDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 />
               </div>
             </div>
 
-            {/* Summary */}
+            {/* Order summary */}
             <div className="mt-6 rounded-xl bg-slate-50 p-5 dark:bg-white/[0.03]">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Order Summary</h3>
               <div className="mt-3 space-y-2 text-sm">
@@ -311,9 +275,19 @@ export default function BuyPolicy() {
                   <span className="font-medium text-gray-900 dark:text-white">{selectedPlan.policy_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">Coverage Limit</span>
+                  <span className="text-gray-500 dark:text-gray-400">Maximum Claim</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    ₹{Number(selectedPlan.coverage_limit).toLocaleString("en-IN")}
+                    {selectedPlan.max_claim != null
+                      ? `₹${Number(selectedPlan.max_claim).toLocaleString("en-IN")}`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Deductible</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {selectedPlan.deductible != null
+                      ? `₹${Number(selectedPlan.deductible).toLocaleString("en-IN")}`
+                      : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
@@ -329,19 +303,13 @@ export default function BuyPolicy() {
 
             {/* Actions */}
             <div className="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => { setSelectedPlan(null); setError(null); }}
-                className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-              >
+              <button type="button" onClick={() => { setSelectedPlan(null); setError(null); }}
+                className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">
                 Change Plan
               </button>
-              <button
-                type="button"
-                onClick={handlePurchase}
+              <button type="button" onClick={handlePurchase}
                 disabled={purchasing || vehicleId === ""}
-                className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
+                className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {purchasing
                   ? "Processing…"
                   : selectedPlan.annual_premium != null
@@ -352,17 +320,17 @@ export default function BuyPolicy() {
           </div>
         )}
 
-        {/* Business rules note */}
+        {/* Prototype disclaimer */}
         <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5 dark:border-amber-500/20 dark:bg-amber-500/5">
           <div className="flex gap-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">!</div>
             <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Important</h3>
               <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                Policies marked with coverage percentages for Minor, Moderate, and Severe damage
-                cover own-vehicle damage. Policies with no coverage percentages set only cover
-                third-party liability. Each vehicle can hold only one active policy at a time.
-                These are prototype policies — not real insurance products.
+                Policies showing coverage percentages cover own-vehicle damage.
+                Policies with no coverage percentages configured only cover third-party liability.
+                Each vehicle can hold only one active policy at a time.
+                These are prototype synthetic policies — not real insurance products.
               </p>
             </div>
           </div>

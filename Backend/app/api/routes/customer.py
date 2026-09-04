@@ -223,17 +223,56 @@ async def register_vehicle(
     current_user: User = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
-    existing = await db.execute(
-        select(Vehicle).where(Vehicle.registration_number == payload.registration_number)
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=409,
-            detail="A vehicle with this registration number already exists.",
+    """
+    Register a new vehicle for this customer.
+
+    The backend auto-generates a unique InsureAI Vehicle Reference ID
+    in the format INS-VEH-YYYY-NNNNN (e.g. INS-VEH-2026-00003).
+
+    This is an InsureAI system-generated reference number — it is NOT
+    an official government or RTO vehicle registration number.
+    The registration_number column stores this system ID.
+
+    Uniqueness is guaranteed by counting existing vehicles in the DB
+    and using a zero-padded counter. A retry loop handles the rare
+    race-condition where two registrations happen simultaneously.
+    """
+    from datetime import datetime as dt
+    from sqlalchemy import func as sqlfunc
+
+    # Determine the next sequence number for this year
+    year = dt.now().year
+    prefix = f"INS-VEH-{year}-"
+
+    max_retries = 5
+    for attempt in range(max_retries):
+        # Count vehicles whose registration_number starts with this year's prefix
+        count_result = await db.execute(
+            select(sqlfunc.count())
+            .select_from(Vehicle)
+            .where(Vehicle.registration_number.like(f"{prefix}%"))
         )
+        count = count_result.scalar() or 0
+        candidate = f"{prefix}{(count + 1):05d}"
+
+        # Check uniqueness
+        existing = await db.execute(
+            select(Vehicle).where(Vehicle.registration_number == candidate)
+        )
+        if existing.scalar_one_or_none() is None:
+            break  # candidate is unique
+        # If taken (race condition), increment and retry
+    else:
+        # Fallback: use UUID suffix to guarantee uniqueness
+        candidate = f"INS-VEH-{year}-{uuid.uuid4().hex[:6].upper()}"
+
     vehicle = Vehicle(
         customer_id=current_user.customer_id,
-        **payload.model_dump(),
+        registration_number=candidate,
+        make=payload.make,
+        model=payload.model,
+        manufacturing_year=payload.manufacturing_year,
+        vehicle_value=payload.vehicle_value,
     )
     db.add(vehicle)
     await db.flush()

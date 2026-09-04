@@ -219,11 +219,13 @@ export default function PolicyDetails() {
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Coverage Limit</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Maximum Claim</p>
               <p className="mt-1 font-medium text-gray-900 dark:text-white">
-                {pt?.coverage_limit != null
-                  ? `₹${Number(pt.coverage_limit).toLocaleString("en-IN")}`
-                  : "—"}
+                {pt?.max_claim != null
+                  ? `₹${Number(pt.max_claim).toLocaleString("en-IN")}`
+                  : pt?.coverage_limit != null
+                    ? `₹${Number(pt.coverage_limit).toLocaleString("en-IN")}`
+                    : "—"}
               </p>
             </div>
             <div>

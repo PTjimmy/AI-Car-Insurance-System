@@ -77,9 +77,13 @@ export default function PolicyCard() {
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Coverage</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Maximum Claim</p>
           <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">
-            ₹{active.policy_type?.coverage_limit?.toLocaleString("en-IN") ?? "—"}
+            {active.policy_type?.max_claim != null
+              ? `₹${Number(active.policy_type.max_claim).toLocaleString("en-IN")}`
+              : active.policy_type?.coverage_limit != null
+                ? `₹${Number(active.policy_type.coverage_limit).toLocaleString("en-IN")}`
+                : "—"}
           </p>
         </div>
         <div>

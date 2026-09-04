@@ -107,16 +107,20 @@ export default function Policies() {
                 {/* Policy details */}
                 <div className="mt-6 grid grid-cols-1 gap-5 border-t border-gray-100 pt-6 dark:border-gray-800 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Coverage Limit</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Maximum Claim</p>
                     <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                      ₹{policyType?.coverage_limit?.toLocaleString("en-IN") ?? "—"}
+                      {policyType?.max_claim != null
+                        ? `₹${Number(policyType.max_claim).toLocaleString("en-IN")}`
+                        : policyType?.coverage_limit != null
+                          ? `₹${Number(policyType.coverage_limit).toLocaleString("en-IN")}`
+                          : "—"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Annual Premium</p>
                     <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
                       {policyType?.annual_premium != null
-                        ? <>₹{policyType.annual_premium.toLocaleString("en-IN")}<span className="text-sm font-normal text-gray-500"> / year</span></>
+                        ? <>{`₹${policyType.annual_premium.toLocaleString("en-IN")}`}<span className="text-sm font-normal text-gray-500"> / year</span></>
                         : <span className="text-sm font-normal text-gray-500">Not specified in prototype</span>}
                     </p>
                   </div>
