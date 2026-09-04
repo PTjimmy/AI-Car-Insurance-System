@@ -150,6 +150,7 @@ export default function AdminDashboard() {
               { label: "Under Review", value: underReview, cls: "bg-purple-50 dark:bg-purple-500/5" },
               { label: "Approved", value: approvedClaims, cls: "bg-green-50 dark:bg-green-500/5" },
               { label: "Rejected", value: rejectedClaims, cls: "bg-red-50 dark:bg-red-500/5" },
+              { label: "Evidence Requested", value: evidenceRequested, cls: "bg-amber-50 dark:bg-amber-500/5" },
             ].map(({ label, value, cls }) => (
               <div key={label} className={`rounded-xl p-5 ${cls}`}>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>

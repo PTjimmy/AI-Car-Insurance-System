@@ -151,6 +151,11 @@ class PolicyTypeOut(BaseModel):
     annual_premium is Optional — prototype policies (P001-P006) do not
     specify an annual premium in the policy document. Display as
     "Not specified in prototype" when NULL, never as ₹0.
+
+    coverage_limit is retained for legacy display only. It is NOT used
+    as a claim validation cap. max_claim is the actual cap (Step 8 of
+    the claim calculation). Do not add pre-validation of claimed_amount
+    against coverage_limit.
     """
     model_config = {"from_attributes": True}
 

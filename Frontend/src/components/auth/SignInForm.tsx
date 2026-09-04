@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -14,9 +14,8 @@ export default function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const { login, user } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,8 +24,8 @@ export default function SignInForm() {
 
     try {
       await login(email, password);
-      // Password accepted — backend sent a 2FA code to their email.
-      // Send them to the verify-login page to enter the code.
+      // Step 1 of 2FA login — password accepted, code sent to email.
+      // Always redirect to /verify-login; role-based redirect happens there.
       navigate(`/verify-login?email=${encodeURIComponent(email)}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -150,7 +149,7 @@ export default function SignInForm() {
           {/* Security Notice */}
           <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-center dark:border-gray-800 dark:bg-white/5">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Your information is protected with secure authentication.
+              Your information is protected with secure 2-factor authentication.
             </p>
           </div>
         </div>

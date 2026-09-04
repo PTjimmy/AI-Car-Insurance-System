@@ -123,12 +123,19 @@ async def _load_claim_full(db: AsyncSession, claim_id: int) -> Claim | None:
 
 def _policy_covers_own_vehicle(policy_type: PolicyType) -> bool:
     """
-    Return True if this policy type has own-vehicle damage coverage.
+    Return True if this policy type covers own-vehicle damage.
 
-    A policy covers own-vehicle damage when at least one of the per-severity
-    coverage percentages is set and greater than zero. This replaces the
-    old hard-coded THIRD_PARTY_ONLY_NAMES string check and works correctly
-    for all current and future policy types.
+    This check is entirely DB-driven — it reads the per-severity coverage
+    percentage columns from the policy_type row:
+      minor_coverage_pct, moderate_coverage_pct, severe_coverage_pct
+
+    A policy covers own-vehicle damage when at least one coverage percentage
+    is set and greater than zero. A policy with all three set to NULL or 0.0
+    (e.g. a third-party-only plan) will return False.
+
+    This replaces any hard-coded policy name checks. Adding a new policy type
+    to the database with NULL/zero coverage percentages will automatically
+    be treated as not covering own-vehicle damage — no code changes needed.
     """
     pcts = [
         policy_type.minor_coverage_pct,

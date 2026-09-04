@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { customerApi, type Claim, type Policy, ApiError } from "../../lib/api";
 import { useClaims } from "../../context/ClaimsContext";
@@ -30,7 +30,6 @@ function policyExpiryWarning(policy: Policy): string | null {
 }
 
 export default function SubmitClaim() {
-  const navigate = useNavigate();
   const { refresh } = useClaims();
 
   // Form state
@@ -62,7 +61,6 @@ export default function SubmitClaim() {
   // ---- Derived: selected policy object ----
   const selectedPolicy = policies.find((p) => p.policy_id === policyId) ?? null;
   const coverageLimit = selectedPolicy?.policy_type?.coverage_limit ?? null;
-  const policyName = selectedPolicy?.policy_type?.policy_name ?? "";
 
   // ---- Client-side checks ----
   // NOTE: No client-side coverage_limit enforcement — the backend's
@@ -152,13 +150,14 @@ export default function SubmitClaim() {
               Claim Submitted Successfully
             </h1>
             <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
-              Your claim has been submitted and is now pending officer assignment.
-              {files.length > 0 && " Your damage images have been saved."}
+              Your claim has been submitted and images have been saved.
             </p>
             <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/5 dark:text-blue-400">
-              AI damage analysis will run automatically once an officer is assigned
-              and the model weights are available. If no AI result appears, the
-              officer will still review your claim and make a decision.
+              <strong>AI analysis:</strong> The ViT-B/16 model ran on your first image
+              when it was uploaded. If model weights were available, a severity prediction
+              and estimated claim amount will appear on your claim. If the model was not
+              loaded, the AI result will show as pending — the Claims Officer will still
+              review your claim and make the final decision.
             </div>
             <div className="mt-6 rounded-xl bg-slate-50 p-4 text-left dark:bg-white/[0.03]">
               <p className="text-xs text-gray-500 dark:text-gray-400">Claim Number</p>
@@ -227,10 +226,12 @@ export default function SubmitClaim() {
             <div>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">What happens after submission?</h2>
               <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                When you upload damage images, the ViT-B/16 AI model will attempt to classify
-                the damage severity (Minor / Moderate / Severe) and calculate an estimated claim
-                amount based on your policy rules. AI analysis requires model weights to be
-                loaded — if unavailable, the Claims Officer will still review your claim.
+                When you upload your <strong>first damage image</strong>, the ViT-B/16 AI
+                model immediately attempts to classify the damage severity (Minor / Moderate /
+                Severe) and calculate an estimated claim amount based on your policy rules.
+                This happens at upload time — not at officer assignment. If the model weights
+                are not loaded, AI analysis will show as unavailable; the Claims Officer
+                still reviews your claim and makes the final decision.
               </p>
             </div>
           </div>

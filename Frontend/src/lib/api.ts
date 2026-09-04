@@ -189,6 +189,7 @@ export interface AdminUser {
   email: string;
   role: UserRole;
   is_active: boolean;
+  is_verified: boolean;
   created_at: string;
   customer_id: number | null;
   officer_id: number | null;
