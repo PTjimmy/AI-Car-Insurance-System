@@ -185,8 +185,8 @@ export default function Vehicles() {
                 <input
                   required
                   type="number"
-                  min={1}
-                  step="1000"
+                  min={0}
+                  step="any"
                   placeholder="e.g. 800000"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}

@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { customerApi, type CustomerProfile } from "../../lib/api";
+import { customerApi, officerApi, type CustomerProfile, type OfficerProfile } from "../../lib/api";
 
 export default function UserInfoCard() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [officerProfile, setOfficerProfile] = useState<OfficerProfile | null>(null);
 
   useEffect(() => {
     if (user?.role === "CUSTOMER") {
-      customerApi.getProfile().then(setProfile).catch(() => {});
+      customerApi.getProfile().then(setCustomerProfile).catch(() => {});
+    } else if (user?.role === "CLAIM_OFFICER" || user?.role === "ADMIN") {
+      officerApi.getProfile().then(setOfficerProfile).catch(() => {});
     }
   }, [user]);
 
@@ -19,10 +22,10 @@ export default function UserInfoCard() {
         ? "Claims Officer"
         : "Customer";
 
-  const fullName = user?.full_name ?? "—";
-  const nameParts = fullName.split(" ");
-  const firstName = nameParts[0] ?? "—";
-  const lastName = nameParts.slice(1).join(" ") || "—";
+  // Resolve fields across roles
+  const firstName = customerProfile?.first_name ?? officerProfile?.first_name ?? user?.full_name?.split(" ")[0] ?? "—";
+  const lastName  = customerProfile?.last_name  ?? officerProfile?.last_name  ?? user?.full_name?.split(" ").slice(1).join(" ") ?? "—";
+  const phone     = customerProfile?.phone      ?? officerProfile?.phone      ?? "—";
 
   return (
     <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
@@ -47,9 +50,7 @@ export default function UserInfoCard() {
             </div>
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">Phone</p>
-              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {profile?.phone ?? "—"}
-              </p>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">{phone}</p>
             </div>
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">Role</p>

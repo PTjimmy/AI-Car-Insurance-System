@@ -355,6 +355,10 @@ export const customerApi = {
 // ---------------------------------------------------------------------------
 
 export const officerApi = {
+  getProfile: () => get<OfficerProfile>("/officer/profile"),
+  updateProfile: (data: { first_name?: string; last_name?: string; phone?: string }) =>
+    put<OfficerProfile>("/officer/profile", data),
+
   getClaims: () => get<Claim[]>("/officer/claims"),
   getClaim: (id: number) => get<Claim>(`/officer/claims/${id}`),
   updateStatus: (

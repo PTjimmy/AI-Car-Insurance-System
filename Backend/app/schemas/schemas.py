@@ -116,6 +116,12 @@ class OfficerOut(BaseModel):
     status: str
 
 
+class OfficerUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+
+
 # ===========================================================================
 # Vehicle
 # ===========================================================================

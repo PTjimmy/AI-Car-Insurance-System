@@ -1,8 +1,13 @@
 """
 Claims Officer routes:
+  GET  /officer/profile             — get own profile (officer name, phone)
+  PUT  /officer/profile             — update own profile (name, phone)
   GET  /officer/claims              — list claims assigned to this officer
   GET  /officer/claims/{claim_id}   — full claim detail with AI + images
   PUT  /officer/claims/{claim_id}/status — update status, add remarks
+
+Note: Admin users also use these profile routes since admin accounts
+      are linked to claim_officer rows via users.officer_id.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,10 +15,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.deps import require_officer
+from app.core.deps import get_current_user, require_officer, require_officer_or_admin
 from app.db.session import get_db
-from app.models.models import Claim, ClaimHistory, ClaimOfficer, Policy, User, Vehicle
-from app.schemas.schemas import ClaimHistoryOut, ClaimOut, ClaimStatusUpdate
+from app.models.models import Claim, ClaimHistory, ClaimOfficer, Policy, User, Vehicle, UserRole
+from app.schemas.schemas import ClaimHistoryOut, ClaimOut, ClaimStatusUpdate, OfficerOut, OfficerUpdate
 
 router = APIRouter(prefix="/officer", tags=["officer"])
 
@@ -25,6 +30,55 @@ async def _get_officer(user: User, db: AsyncSession) -> ClaimOfficer:
     officer = result.scalar_one_or_none()
     if not officer:
         raise HTTPException(status_code=404, detail="Officer profile not found.")
+    return officer
+
+
+# ---------------------------------------------------------------------------
+# Profile — available to both CLAIM_OFFICER and ADMIN
+# ---------------------------------------------------------------------------
+
+@router.get("/profile", response_model=OfficerOut)
+async def get_officer_profile(
+    current_user: User = Depends(require_officer_or_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the current officer/admin's profile."""
+    if current_user.officer_id is None:
+        # Admin created without a linked officer row — return a minimal profile
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No officer profile linked to this admin account. "
+                "Create the admin account via POST /admin/officers to get a linked profile."
+            ),
+        )
+    return await _get_officer(current_user, db)
+
+
+@router.put("/profile", response_model=OfficerOut)
+async def update_officer_profile(
+    payload: OfficerUpdate,
+    current_user: User = Depends(require_officer_or_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update name and/or phone for the current officer/admin."""
+    if current_user.officer_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No officer profile linked to this admin account. "
+                "Create the admin account via POST /admin/officers to get a linked profile."
+            ),
+        )
+    officer = await _get_officer(current_user, db)
+
+    if payload.first_name is not None:
+        officer.first_name = payload.first_name
+    if payload.last_name is not None:
+        officer.last_name = payload.last_name
+    if payload.phone is not None:
+        officer.phone = payload.phone
+
     return officer
 
 
